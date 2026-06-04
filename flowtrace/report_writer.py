@@ -112,10 +112,10 @@ def _build_markdown_report(
         f"- Risky unexecuted function count: {len(static_runtime_comparison.risky_unexecuted_functions)}",
         f"- Runtime functions without static definition count: {len(static_runtime_comparison.runtime_functions_without_static_definition)}",
         "",
-        "### Top risks",
-        *_items(_format_side_effect(item) for item in top_risks),
+        "## 2. Recommended next checks",
+        *_recommended_next_checks(runtime_result, risk_groups, static_runtime_comparison),
         "",
-        "## 2. Project summary",
+        "## 3. Project summary",
         f"- Project root: `{project_root}`",
         f"- Runtime attempted: {runtime_result.runtime_attempted}",
         f"- Runtime completed: {runtime_result.completed}",
@@ -125,22 +125,10 @@ def _build_markdown_report(
         f"- Target args display: `{target_args_display(runtime_result.target_args)}`",
         *_runtime_argument_warnings(runtime_result),
         "",
-        "## 3. Entry file",
-        f"- `{relative_path(entry_path, project_root)}`",
+        "## 4. Top risks",
+        *_items(_format_side_effect(item) for item in top_risks),
         "",
-        "## 4. Files scanned",
-        *_items(file.path for file in static_result.files),
-        "",
-        "## 5. Imports found",
-        *_items(_format_import(item) for item in static_result.imports),
-        "",
-        "## 6. Functions found",
-        *_items(f"{item.id}({', '.join(item.args)}) at {item.file}:{item.line}" for item in static_result.functions),
-        "",
-        "## 7. Functions executed",
-        *_items(dict.fromkeys(executed).keys()),
-        "",
-        "## Static vs runtime comparison",
+        "## 5. Static vs runtime comparison",
         *_comparison_summary_items(static_runtime_comparison),
         "",
         "### Executed static functions",
@@ -161,35 +149,23 @@ def _build_markdown_report(
         "### Static resolved calls not observed",
         *_static_call_not_observed_items(static_runtime_comparison.static_resolved_calls_not_observed),
         "",
-        "## 8. Functions defined but not executed",
-        *_defined_not_executed_items(runtime_result, diagnostics),
-        "",
-        "## 9. Assigned variables never read",
-        *_items(
-            f"{item.name} at {item.file}:{item.line} in {_scope_label(item.in_function)}"
-            for item in diagnostics.assigned_variables_never_read
-        ),
-        "",
-        "## 10. High-risk side effects",
+        "## 6. High-risk side effects",
         *_items(_format_side_effect(item) for item in risk_groups["high"]),
         "",
-        "## 11. Medium-risk side effects",
+        "## 7. Medium-risk side effects",
         *_items(_format_side_effect(item) for item in risk_groups["medium"]),
         "",
-        "## 12. Low-risk side effects",
+        "## 8. Low-risk side effects",
         *_items(_filtered_low_risk_side_effects(risk_groups["low"])),
         "",
-        "## 13. Runtime call order",
+        "## 9. Runtime errors",
+        *_runtime_error_items(diagnostics.runtime_error_path),
+        "",
+        "## 10. Runtime call order",
         "- Synthetic root: `PROGRAM_START`",
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),
         "",
-        "## 14. Runtime errors",
-        *_runtime_error_items(diagnostics.runtime_error_path),
-        "",
-        "## 15. Mermaid diagram location",
-        f"- `{flow_path}`",
-        "",
-        "## 16. Intended flow comparison",
+        "## 11. Intended flow comparison",
         f"- Name: `{intended_comparison.name or 'None'}`",
         "- Expected order:",
         *_items(intended_comparison.expected_runtime_order),
@@ -200,6 +176,35 @@ def _build_markdown_report(
         "- Unexpected actual functions:",
         *_items(intended_comparison.unexpected_actual_functions),
         f"- Order mismatch summary: {intended_comparison.order_mismatch_summary}",
+        "",
+        "## 12. Legacy unexecuted function diagnostics",
+        "- Prefer `## 5. Static vs runtime comparison` for detailed execution comparison.",
+        f"- Count: {_defined_not_executed_count_label(runtime_result, diagnostics)}",
+        *_defined_not_executed_items(runtime_result, diagnostics, details=False),
+        "",
+        "## 13. Assigned variables never read",
+        *_items(
+            f"{item.name} at {item.file}:{item.line} in {_scope_label(item.in_function)}"
+            for item in diagnostics.assigned_variables_never_read
+        ),
+        "",
+        "## 14. Entry file",
+        f"- `{relative_path(entry_path, project_root)}`",
+        "",
+        "## 15. Files scanned",
+        *_items(file.path for file in static_result.files),
+        "",
+        "## 16. Imports found",
+        *_items(_format_import(item) for item in static_result.imports),
+        "",
+        "## 17. Functions found",
+        *_items(f"{item.id}({', '.join(item.args)}) at {item.file}:{item.line}" for item in static_result.functions),
+        "",
+        "## 18. Functions executed",
+        *_items(dict.fromkeys(executed).keys()),
+        "",
+        "## 19. Mermaid diagram location",
+        f"- `{flow_path}`",
         "",
     ]
     return "\n".join(lines)
@@ -249,6 +254,28 @@ def _runtime_argument_warnings(runtime_result: RuntimeTraceResult) -> list[str]:
     return []
 
 
+def _recommended_next_checks(
+    runtime_result: RuntimeTraceResult,
+    risk_groups: dict[str, list[SideEffectRecord]],
+    comparison: StaticRuntimeComparison,
+) -> list[str]:
+    checks: list[str] = []
+    if risk_groups["high"]:
+        checks.append("- Review high-risk side effects before runtime execution.")
+    if runtime_result.runtime_skipped:
+        checks.append("- Static-only mode was a safe first pass; runtime comparison is unavailable because runtime was skipped.")
+        checks.append("- Review top risks before using runtime mode.")
+    if runtime_result.runtime_attempted and not runtime_result.completed:
+        checks.append("- Check runtime errors and the partial static-vs-runtime comparison.")
+    if runtime_result.runtime_attempted and not runtime_result.target_args:
+        checks.append("- Pass `--target-args` for CLI-style projects to trace the intended command path.")
+    if comparison.risky_unexecuted_functions:
+        checks.append("- Review risky unexecuted functions in the static-vs-runtime comparison.")
+    if not checks:
+        checks.append("- No immediate high-priority checks found.")
+    return checks
+
+
 def _defined_not_executed_count_label(
     runtime_result: RuntimeTraceResult,
     diagnostics: DiagnosticsResult,
@@ -261,9 +288,12 @@ def _defined_not_executed_count_label(
 def _defined_not_executed_items(
     runtime_result: RuntimeTraceResult,
     diagnostics: DiagnosticsResult,
+    details: bool = True,
 ) -> list[str]:
     if runtime_result.runtime_skipped:
         return ["- Runtime was skipped, so unexecuted-function diagnostics are unavailable."]
+    if not details:
+        return ["- Detailed list omitted here to avoid duplication."]
     return _items(diagnostics.functions_defined_but_not_executed)
 
 
