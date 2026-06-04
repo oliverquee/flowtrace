@@ -64,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
                 entry_path,
                 project_root,
                 "Static-only mode requested",
+                target_args,
             )
         else:
             runtime_result = run_with_trace(entry_path, project_root, target_args)

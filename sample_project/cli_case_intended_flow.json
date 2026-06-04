@@ -1,0 +1,10 @@
+{
+  "name": "cli_case_hello_flow",
+  "expected_runtime_order": [
+    "cli_case.main",
+    "cli_case.build_parser",
+    "cli_case.run_hello",
+    "cli_case.build_greeting",
+    "cli_case.print_greeting"
+  ]
+}

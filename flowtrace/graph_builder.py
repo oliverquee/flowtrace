@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from .diagnostics import DiagnosticsResult
-from .runtime_tracer import RuntimeTraceResult
+from .runtime_tracer import RuntimeTraceResult, target_args_display
 from .static_analyzer import StaticAnalysisResult
 
 
@@ -57,6 +57,8 @@ def build_runtime_graph(runtime_result: RuntimeTraceResult) -> dict[str, object]
         "runtime_attempted": runtime_result.runtime_attempted,
         "runtime_skipped": runtime_result.runtime_skipped,
         "runtime_skipped_reason": runtime_result.runtime_skipped_reason,
+        "target_args": runtime_result.target_args,
+        "target_args_display": target_args_display(runtime_result.target_args),
         "completed": runtime_result.completed,
         "nodes": list(nodes.values()),
         "edges": [

@@ -36,6 +36,19 @@ Pass arguments to the target script without shell execution:
 python -m flowtrace.cli --entry project\main.py --target-args "scan-inbox --limit 5"
 ```
 
+For CLI-style projects, pass the command and flags that should become the target script's `sys.argv`:
+
+```powershell
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham"
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "fail"
+```
+
+If runtime is attempted without target args, `report.md` warns that FlowTrace may only trace startup, imports, or parser setup. Static-only mode can still record which args you would have used:
+
+```powershell
+python -m flowtrace.cli --entry sample_project\cli_case.py --static-only --target-args "hello --name Pratham"
+```
+
 ## Error Case Usage
 
 FlowTrace catches runtime errors from the target script and still writes reports.
@@ -101,6 +114,7 @@ The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trac
 - Handles runtime errors and still writes reports.
 - Supports static-only analysis for safer first passes on real projects.
 - Supports simple target argument passthrough with `--target-args`.
+- Reports parsed target args and a shell-like display string.
 
 ## Constraints
 
@@ -113,6 +127,7 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - Dynamic imports, monkey patching, decorators, aliases through containers, and complex package layouts may not resolve perfectly.
 - Runtime tracing only records functions inside the selected project root.
 - Runtime mode executes target code and can trigger target side effects.
+- CLI-style projects should usually be run with `--target-args` so runtime tracing reaches the intended command path.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Markdown reports are curated for readability; JSON outputs remain the source for complete raw data.
 - Intended flow comparison ignores module-level events by default.

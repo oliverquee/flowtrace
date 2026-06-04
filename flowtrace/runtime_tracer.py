@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import runpy
+import shlex
 import sys
 import time
 from dataclasses import dataclass, field
@@ -34,22 +35,34 @@ class RuntimeTraceResult:
     runtime_attempted: bool = True
     runtime_skipped: bool = False
     runtime_skipped_reason: str | None = None
+    target_args: list[str] = field(default_factory=list)
     completed: bool = True
 
 
-def skipped_runtime_result(entry_path: Path, project_root: Path, reason: str) -> RuntimeTraceResult:
+def skipped_runtime_result(
+    entry_path: Path,
+    project_root: Path,
+    reason: str,
+    target_args: list[str] | None = None,
+) -> RuntimeTraceResult:
     return RuntimeTraceResult(
         entry=str(entry_path),
         project_root=str(project_root),
         runtime_attempted=False,
         runtime_skipped=True,
         runtime_skipped_reason=reason,
+        target_args=target_args or [],
         completed=False,
     )
 
 
 def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] | None = None) -> RuntimeTraceResult:
-    result = RuntimeTraceResult(entry=str(entry_path), project_root=str(project_root))
+    parsed_target_args = target_args or []
+    result = RuntimeTraceResult(
+        entry=str(entry_path),
+        project_root=str(project_root),
+        target_args=parsed_target_args,
+    )
     previous_trace = sys.gettrace()
     previous_argv = sys.argv[:]
     previous_path = sys.path[:]
@@ -108,7 +121,7 @@ def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] 
 
     try:
         sys.path = [str(entry_path.parent), str(project_root), *previous_path]
-        sys.argv = [str(entry_path), *(target_args or [])]
+        sys.argv = [str(entry_path), *parsed_target_args]
         sys.settrace(tracer)
         runpy.run_path(str(entry_path), run_name="__main__")
     except BaseException as exc:
@@ -144,3 +157,9 @@ def _should_trace(path: Path, project_root: Path, target_is_flowtrace: bool) -> 
 
 def _qualname(frame: FrameType) -> str:
     return getattr(frame.f_code, "co_qualname", frame.f_code.co_name)
+
+
+def target_args_display(target_args: list[str]) -> str:
+    if not target_args:
+        return "None"
+    return " ".join(shlex.quote(arg) for arg in target_args)

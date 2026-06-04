@@ -8,7 +8,7 @@ from typing import Any
 
 from .diagnostics import DiagnosticsResult
 from .intended_flow import IntendedFlowComparison
-from .runtime_tracer import RuntimeTraceResult
+from .runtime_tracer import RuntimeTraceResult, target_args_display
 from .static_analyzer import SideEffectRecord, StaticAnalysisResult
 from .utils import relative_path
 
@@ -63,6 +63,8 @@ def _runtime_jsonl(runtime_result: RuntimeTraceResult) -> str:
                 "runtime_attempted": runtime_result.runtime_attempted,
                 "runtime_skipped": runtime_result.runtime_skipped,
                 "runtime_skipped_reason": runtime_result.runtime_skipped_reason,
+                "target_args": runtime_result.target_args,
+                "target_args_display": target_args_display(runtime_result.target_args),
                 "completed": runtime_result.completed,
             },
             sort_keys=True,
@@ -93,6 +95,8 @@ def _build_markdown_report(
         f"- Runtime attempted: {runtime_result.runtime_attempted}",
         f"- Runtime completed: {runtime_result.completed}",
         f"- Runtime skipped: {runtime_result.runtime_skipped}",
+        f"- Target args: {_target_args_label(runtime_result.target_args)}",
+        f"- Target args display: `{target_args_display(runtime_result.target_args)}`",
         f"- Runtime error count: {len(diagnostics.runtime_error_path)}",
         f"- High-risk side effect count: {len(risk_groups['high'])}",
         f"- Medium-risk side effect count: {len(risk_groups['medium'])}",
@@ -109,6 +113,9 @@ def _build_markdown_report(
         f"- Runtime completed: {runtime_result.completed}",
         f"- Runtime skipped: {runtime_result.runtime_skipped}",
         f"- Runtime skipped reason: {runtime_result.runtime_skipped_reason or 'None'}",
+        f"- Target args: {_target_args_label(runtime_result.target_args)}",
+        f"- Target args display: `{target_args_display(runtime_result.target_args)}`",
+        *_runtime_argument_warnings(runtime_result),
         "",
         "## 3. Entry file",
         f"- `{relative_path(entry_path, project_root)}`",
@@ -199,6 +206,18 @@ def _items(values: Any) -> list[str]:
     if not items:
         return ["- None"]
     return [f"- {item}" for item in items]
+
+
+def _target_args_label(target_args: list[str]) -> str:
+    return "None" if not target_args else repr(target_args)
+
+
+def _runtime_argument_warnings(runtime_result: RuntimeTraceResult) -> list[str]:
+    if runtime_result.runtime_attempted and not runtime_result.target_args:
+        return [
+            "- Warning: Runtime was attempted without target args. For CLI-style projects, this may only trace startup/import/parser setup."
+        ]
+    return []
 
 
 def _runtime_error_items(errors: list[dict[str, str | int | None]]) -> list[str]:
