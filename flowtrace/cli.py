@@ -6,6 +6,7 @@ import argparse
 import shlex
 from pathlib import Path
 
+from .comparison import build_static_runtime_comparison
 from .diagnostics import build_diagnostics
 from .graph_builder import build_runtime_graph, build_static_graph
 from .intended_flow import compare_intended_flow
@@ -70,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             runtime_result = run_with_trace(entry_path, project_root, target_args)
         intended_comparison = compare_intended_flow(args.intended_flow, runtime_result)
         diagnostics = build_diagnostics(static_result, runtime_result)
+        static_runtime_comparison = build_static_runtime_comparison(static_result, runtime_result)
         static_graph = build_static_graph(static_result, diagnostics)
         runtime_graph = build_runtime_graph(runtime_result)
         written_files = write_reports(
@@ -82,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
             static_graph=static_graph,
             runtime_graph=runtime_graph,
             intended_comparison=intended_comparison,
+            static_runtime_comparison=static_runtime_comparison,
         )
     except FlowTraceError as exc:
         parser.exit(status=1, message=f"flowtrace: {exc}\n")

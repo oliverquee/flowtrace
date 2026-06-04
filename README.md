@@ -91,6 +91,14 @@ Expected flow format:
 
 Intended flow comparison ignores module-level runtime events such as `main.<module>` by default. Raw runtime outputs still keep those events.
 
+## Static Vs Runtime Comparison
+
+`report.md` compares static function definitions against runtime functions observed during tracing. It highlights executed static functions, static functions not executed, runtime functions without static definitions, risky unexecuted functions, and best-effort static local calls that were not observed at runtime.
+
+Static-only mode cannot compare actual execution because the target script is not run. In that case, FlowTrace still reports static function counts and keeps risky static side effects in the risk-ranked sections, but marks execution comparison as unavailable.
+
+If runtime starts but fails, FlowTrace keeps a partial comparison based on the runtime trace captured before the error.
+
 ## Outputs
 
 - `flowtrace_output/static_graph.json`
@@ -130,5 +138,6 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - CLI-style projects should usually be run with `--target-args` so runtime tracing reaches the intended command path.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Markdown reports are curated for readability; JSON outputs remain the source for complete raw data.
+- Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual and does not include a visual editor.

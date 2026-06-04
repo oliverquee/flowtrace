@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .comparison import StaticRuntimeComparison, StaticCallNotObserved, RiskyUnexecutedFunction
 from .diagnostics import DiagnosticsResult
 from .intended_flow import IntendedFlowComparison
 from .runtime_tracer import RuntimeTraceResult, target_args_display
@@ -23,6 +24,7 @@ def write_reports(
     static_graph: dict[str, object],
     runtime_graph: dict[str, object],
     intended_comparison: IntendedFlowComparison,
+    static_runtime_comparison: StaticRuntimeComparison,
 ) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,6 +46,7 @@ def write_reports(
             diagnostics,
             flow_path,
             intended_comparison,
+            static_runtime_comparison,
         ),
         encoding="utf-8",
     )
@@ -80,6 +83,7 @@ def _build_markdown_report(
     diagnostics: DiagnosticsResult,
     flow_path: Path,
     intended_comparison: IntendedFlowComparison,
+    static_runtime_comparison: StaticRuntimeComparison,
 ) -> str:
     executed = [event.function for event in runtime_result.events if event.event == "function_enter"]
     risk_groups = _side_effects_by_risk(diagnostics.side_effect_calls)
@@ -101,8 +105,12 @@ def _build_markdown_report(
         f"- High-risk side effect count: {len(risk_groups['high'])}",
         f"- Medium-risk side effect count: {len(risk_groups['medium'])}",
         f"- Low-risk side effect count: {len(risk_groups['low'])}",
-        f"- Defined-but-not-executed function count: {len(diagnostics.functions_defined_but_not_executed)}",
+        f"- Defined-but-not-executed function count: {_defined_not_executed_count_label(runtime_result, diagnostics)}",
         f"- Assigned-but-unread variable count: {len(diagnostics.assigned_variables_never_read)}",
+        f"- Executed static function count: {len(static_runtime_comparison.executed_static_functions)}",
+        f"- Static-only comparison unavailable: {static_runtime_comparison.comparison_unavailable}",
+        f"- Risky unexecuted function count: {len(static_runtime_comparison.risky_unexecuted_functions)}",
+        f"- Runtime functions without static definition count: {len(static_runtime_comparison.runtime_functions_without_static_definition)}",
         "",
         "### Top risks",
         *_items(_format_side_effect(item) for item in top_risks),
@@ -132,8 +140,29 @@ def _build_markdown_report(
         "## 7. Functions executed",
         *_items(dict.fromkeys(executed).keys()),
         "",
+        "## Static vs runtime comparison",
+        *_comparison_summary_items(static_runtime_comparison),
+        "",
+        "### Executed static functions",
+        *_comparison_items(static_runtime_comparison.executed_static_functions, static_runtime_comparison),
+        "",
+        "### Static functions not executed",
+        *_comparison_items(static_runtime_comparison.static_functions_not_executed, static_runtime_comparison),
+        "",
+        "### Runtime functions without static definition",
+        *_comparison_items(
+            static_runtime_comparison.runtime_functions_without_static_definition,
+            static_runtime_comparison,
+        ),
+        "",
+        "### Risky unexecuted functions",
+        *_risky_unexecuted_function_items(static_runtime_comparison.risky_unexecuted_functions),
+        "",
+        "### Static resolved calls not observed",
+        *_static_call_not_observed_items(static_runtime_comparison.static_resolved_calls_not_observed),
+        "",
         "## 8. Functions defined but not executed",
-        *_items(diagnostics.functions_defined_but_not_executed),
+        *_defined_not_executed_items(runtime_result, diagnostics),
         "",
         "## 9. Assigned variables never read",
         *_items(
@@ -218,6 +247,69 @@ def _runtime_argument_warnings(runtime_result: RuntimeTraceResult) -> list[str]:
             "- Warning: Runtime was attempted without target args. For CLI-style projects, this may only trace startup/import/parser setup."
         ]
     return []
+
+
+def _defined_not_executed_count_label(
+    runtime_result: RuntimeTraceResult,
+    diagnostics: DiagnosticsResult,
+) -> str:
+    if runtime_result.runtime_skipped:
+        return "N/A (runtime skipped)"
+    return str(len(diagnostics.functions_defined_but_not_executed))
+
+
+def _defined_not_executed_items(
+    runtime_result: RuntimeTraceResult,
+    diagnostics: DiagnosticsResult,
+) -> list[str]:
+    if runtime_result.runtime_skipped:
+        return ["- Runtime was skipped, so unexecuted-function diagnostics are unavailable."]
+    return _items(diagnostics.functions_defined_but_not_executed)
+
+
+def _comparison_summary_items(comparison: StaticRuntimeComparison) -> list[str]:
+    lines = [
+        f"- Static functions found count: {len(comparison.static_functions)}",
+        f"- Runtime functions observed count: {len(comparison.runtime_functions)}",
+        f"- Executed static functions count: {len(comparison.executed_static_functions)}",
+        f"- Static functions not executed count: {len(comparison.static_functions_not_executed)}",
+        f"- Runtime functions without static definition count: {len(comparison.runtime_functions_without_static_definition)}",
+        f"- Risky unexecuted functions count: {len(comparison.risky_unexecuted_functions)}",
+        f"- Static resolved calls not observed count: {len(comparison.static_resolved_calls_not_observed)}",
+    ]
+    if comparison.comparison_unavailable_reason:
+        lines.append(f"- {comparison.comparison_unavailable_reason}")
+    if comparison.partial_runtime:
+        lines.append("- Runtime did not complete, so comparison is based on partial runtime trace.")
+    return lines
+
+
+def _comparison_items(items: list[str], comparison: StaticRuntimeComparison) -> list[str]:
+    if comparison.comparison_unavailable:
+        return ["- Runtime was skipped, so execution comparison is unavailable."]
+    return _items(items)
+
+
+def _risky_unexecuted_function_items(items: list[RiskyUnexecutedFunction]) -> list[str]:
+    if not items:
+        return ["- None"]
+    lines: list[str] = []
+    for item in items:
+        lines.append(f"- {item.function_id} at {item.file}:{item.line}")
+        for side_effect in item.side_effects:
+            lines.append(
+                f"-   {side_effect.category}/{_side_effect_risk(side_effect)}/{side_effect.call}/{side_effect.file}:{side_effect.line}"
+            )
+    return lines
+
+
+def _static_call_not_observed_items(items: list[StaticCallNotObserved]) -> list[str]:
+    if not items:
+        return ["- None"]
+    return [
+        f"- {item.caller} -> {item.callee} via `{item.call}` at {item.file}:{item.line}"
+        for item in items
+    ]
 
 
 def _runtime_error_items(errors: list[dict[str, str | int | None]]) -> list[str]:
