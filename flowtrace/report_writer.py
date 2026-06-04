@@ -99,7 +99,10 @@ def _build_markdown_report(
         ),
         "",
         "## 9. Side-effect calls",
-        *_items(f"{item.call} at {item.file}:{item.line}" for item in diagnostics.side_effect_calls),
+        *_items(
+            f"{item.category}: {item.call} at {item.file}:{item.line}"
+            for item in diagnostics.side_effect_calls
+        ),
         "",
         "## 10. Runtime call order",
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),

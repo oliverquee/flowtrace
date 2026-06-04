@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 flowtrace_output/
+sample_project_output/
 *.log
 .env
 .DS_Store

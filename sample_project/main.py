@@ -16,7 +16,7 @@ def format_message(name: str) -> str:
 
 
 def write_audit_line(message: str) -> Path:
-    output_dir = Path("flowtrace_output")
+    output_dir = Path("sample_project_output")
     output_dir.mkdir(exist_ok=True)
     audit_path = output_dir / "sample_project_side_effect.txt"
     audit_path.write_text(message, encoding="utf-8")

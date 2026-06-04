@@ -100,6 +100,7 @@ class ReturnRecord:
 
 @dataclass(frozen=True)
 class SideEffectRecord:
+    category: str
     call: str
     file: str
     line: int
@@ -280,6 +281,7 @@ class _StaticVisitor(ast.NodeVisitor):
         if _is_side_effect_call(call_name):
             self.analysis.side_effects.append(
                 SideEffectRecord(
+                    category=_side_effect_category(call_name),
                     call=call_name,
                     file=self.analysis.path,
                     line=node.lineno,
@@ -353,3 +355,19 @@ def _call_name(node: ast.AST) -> str:
 
 def _is_side_effect_call(call_name: str) -> bool:
     return call_name in SIDE_EFFECT_CALLS or call_name.endswith(SIDE_EFFECT_SUFFIXES)
+
+
+def _side_effect_category(call_name: str) -> str:
+    if call_name in {"print", "input"}:
+        return "console_output"
+    if call_name == "open" or call_name.endswith((".open", ".write", ".write_text", ".write_bytes")):
+        return "file_write"
+    if call_name in {"os.remove", "os.unlink", "shutil.rmtree"} or call_name.endswith(
+        (".unlink", ".remove", ".rmtree")
+    ):
+        return "file_delete"
+    if call_name.startswith("subprocess."):
+        return "process"
+    if call_name.endswith((".append", ".update", ".clear", ".extend")):
+        return "state_mutation"
+    return "other_side_effect"
