@@ -3,9 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.1.4
-- Latest stable commit: a04a7d9
-- V0.1.5 is in progress on feature branches for static-vs-runtime comparison improvements.
+- Current stable version: V0.1.5
+- Latest stable commit: 95e41e5
 
 ## Current Tested Commands
 
