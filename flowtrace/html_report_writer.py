@@ -22,6 +22,7 @@ def write_html_report(
     runtime_result: RuntimeTraceResult,
     diagnostics: DiagnosticsResult,
     flow_path: Path,
+    runtime_graph: dict[str, object],
     intended_comparison: IntendedFlowComparison,
     static_runtime_comparison: StaticRuntimeComparison,
 ) -> None:
@@ -33,6 +34,7 @@ def write_html_report(
         runtime_result,
         diagnostics,
         flow_path,
+        runtime_graph,
         intended_comparison,
         static_runtime_comparison,
         risk_groups,
@@ -47,6 +49,7 @@ def _document(
     runtime_result: RuntimeTraceResult,
     diagnostics: DiagnosticsResult,
     flow_path: Path,
+    runtime_graph: dict[str, object],
     intended_comparison: IntendedFlowComparison,
     comparison: StaticRuntimeComparison,
     risk_groups: dict[str, list[SideEffectRecord]],
@@ -72,6 +75,7 @@ def _document(
             _section("Project summary", _key_values(_project_summary(project_root, runtime_result)), open_=True),
             _section("Top risks", _side_effect_table(top_risks), open_=True),
             _section("Static vs runtime comparison", _comparison_html(comparison), open_=True),
+            _section("Runtime flowchart", _runtime_flowchart_html(runtime_result, runtime_graph), open_=True),
             _section("High-risk side effects", _side_effect_table(risk_groups["high"]), open_=True),
             _section("Medium-risk side effects", _side_effect_table(risk_groups["medium"]), open_=False),
             _section("Low-risk side effects", _side_effect_table(risk_groups["low"]), open_=False),
@@ -184,6 +188,103 @@ def _comparison_list(items: list[str], comparison: StaticRuntimeComparison) -> s
     if comparison.comparison_unavailable:
         return _list(["Runtime was skipped, so execution comparison is unavailable."])
     return _list(items)
+
+
+def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: dict[str, object]) -> str:
+    if runtime_result.runtime_skipped:
+        return "<p>Runtime was skipped, so no runtime flowchart is available.</p>"
+
+    nodes = [_node_id(node) for node in runtime_graph.get("nodes", [])]
+    edges = [
+        (str(edge.get("caller")), str(edge.get("callee")))
+        for edge in runtime_graph.get("edges", [])
+        if isinstance(edge, dict) and edge.get("caller") and edge.get("callee")
+    ]
+    if not nodes and not edges:
+        return "<p>No runtime flowchart data was captured.</p>"
+
+    parts = ["<p class='hint'>Diagram is a simplified runtime flow view.</p>"]
+    if runtime_result.runtime_attempted and not runtime_result.completed:
+        parts.append("<p class='hint'>Runtime did not complete; this flowchart is based on partial trace data.</p>")
+    parts.append(_runtime_flowchart_svg(nodes, edges))
+    return "".join(parts)
+
+
+def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str]]) -> str:
+    ordered_nodes = _ordered_flow_nodes(nodes, edges)
+    if not ordered_nodes:
+        return "<p>No runtime flowchart data was captured.</p>"
+
+    row_height = 74
+    longest_label = max((len(node) for node in ordered_nodes), default=20)
+    box_width = min(1200, max(520, longest_label * 8 + 36))
+    box_height = 40
+    left = 28
+    top = 20
+    width = box_width + 170
+    height = top * 2 + max(1, len(ordered_nodes)) * row_height
+    center_x = left + box_width / 2
+
+    node_y = {node: top + index * row_height for index, node in enumerate(ordered_nodes)}
+    edge_set = sorted(set(edges))
+    svg_parts = [
+        "<div class='flowchart-wrap'>",
+        (
+            f"<svg class='runtime-flowchart' viewBox='0 0 {width} {height}' "
+            "role='img' aria-label='Simplified runtime flowchart' xmlns='http://www.w3.org/2000/svg'>"
+        ),
+        "<defs><marker id='arrow' markerWidth='10' markerHeight='10' refX='8' refY='3' orient='auto' markerUnits='strokeWidth'>"
+        "<path d='M0,0 L0,6 L9,3 z' fill='#475569'/></marker></defs>",
+    ]
+
+    for caller, callee in edge_set:
+        if caller not in node_y or callee not in node_y or caller == callee:
+            continue
+        start_y = node_y[caller] + box_height
+        end_y = node_y[callee]
+        if node_y[callee] > node_y[caller]:
+            svg_parts.append(
+                f"<line x1='{center_x:.0f}' y1='{start_y}' x2='{center_x:.0f}' y2='{end_y}' "
+                "stroke='#475569' stroke-width='1.6' marker-end='url(#arrow)'/>"
+            )
+        else:
+            lane_x = left + box_width + 36
+            svg_parts.append(
+                f"<path d='M {center_x:.0f} {start_y} L {lane_x} {start_y} L {lane_x} {end_y + box_height / 2:.0f} "
+                f"L {left + box_width} {end_y + box_height / 2:.0f}' fill='none' stroke='#94a3b8' "
+                "stroke-width='1.4' marker-end='url(#arrow)'/>"
+            )
+
+    for node in ordered_nodes:
+        y = node_y[node]
+        svg_parts.append(f"<rect x='{left}' y='{y}' width='{box_width}' height='{box_height}' rx='6' fill='#f8fafc' stroke='#94a3b8'/>")
+        svg_parts.append(f"<text x='{left + 14}' y='{y + 25}' font-family='Consolas, Menlo, monospace' font-size='13' fill='#0f172a'>{_e(node)}</text>")
+
+    svg_parts.extend(["</svg>", "</div>"])
+    return "".join(svg_parts)
+
+
+def _node_id(node: object) -> str:
+    if isinstance(node, dict):
+        return str(node.get("id", ""))
+    return str(node)
+
+
+def _ordered_flow_nodes(nodes: list[str], edges: list[tuple[str, str]]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+
+    def add(node: str) -> None:
+        if node and node not in seen:
+            seen.add(node)
+            ordered.append(node)
+
+    for caller, callee in edges:
+        add(caller)
+        add(callee)
+    for node in nodes:
+        add(node)
+    return ordered
 
 
 def _side_effect_table(items: list[SideEffectRecord]) -> str:
@@ -374,5 +475,7 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .kv th{width:260px;color:#667085}.badge{display:inline-block;border-radius:999px;padding:2px 8px;font-weight:700;font-size:12px}
 .high{background:#fee2e2;color:#991b1b}.medium{background:#fef3c7;color:#92400e}.low{background:#dcfce7;color:#166534}
 .hint{border-left:4px solid #94a3b8;padding-left:10px;color:#475569}
+.flowchart-wrap{overflow-x:auto;border:1px solid #e1e6ef;border-radius:8px;background:#fff;margin-top:10px}
+.runtime-flowchart{display:block;min-width:720px;max-width:100%;height:auto}
 li{margin:3px 0;overflow-wrap:anywhere}
 """.strip()

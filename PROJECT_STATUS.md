@@ -6,6 +6,7 @@
 - Current stable version: V0.1.6
 - Latest stable commit: 3fced47
 - V0.2 is in progress on feature branches for a lightweight local HTML report viewer.
+- V0.2.1 is in progress on feature branches for an embedded static SVG runtime flowchart in `report.html`.
 
 ## Current Tested Commands
 

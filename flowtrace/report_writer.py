@@ -60,6 +60,7 @@ def write_reports(
         runtime_result=runtime_result,
         diagnostics=diagnostics,
         flow_path=flow_path,
+        runtime_graph=runtime_graph,
         intended_comparison=intended_comparison,
         static_runtime_comparison=static_runtime_comparison,
     )
