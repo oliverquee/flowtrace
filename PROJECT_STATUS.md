@@ -3,10 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.2.2
-- Latest stable commit: 903372c
-- V0.2.3 is in progress on feature branches for HTML report navigation and print/PDF usability.
-- V0.3 is in progress on feature branches for intended-flow validation and richer comparison results.
+- Current stable version: V0.3
+- Latest stable commit: 1c18533
 
 ## Current Tested Commands
 
