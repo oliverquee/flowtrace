@@ -5,6 +5,7 @@
 - Current stable branch: main
 - Current stable version: V0.2.1
 - Latest stable commit: ccb8c8b
+- V0.2.2 is in progress on feature branches for embedded HTML flowchart readability polish.
 
 ## Current Tested Commands
 

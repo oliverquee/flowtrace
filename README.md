@@ -112,9 +112,9 @@ The markdown report is organized for review: summary, recommended checks, projec
 
 The HTML report is a static local file with inline CSS, native collapsible sections, and no external resources, JavaScript, CDN, server, or network calls.
 
-`report.html` includes a simple embedded static SVG runtime flowchart built from `runtime_graph.json` data. The diagram is best-effort and is not a visual editor. `flow.mmd` is still generated for Mermaid-compatible tools.
+`report.html` includes a simple embedded static SVG runtime flowchart built from `runtime_graph.json` data. The diagram is simplified, best-effort, and is not a visual editor. Repeated runtime edges may be summarized with count labels such as `x3`. `flow.mmd` is still generated for Mermaid-compatible tools.
 
-The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or graph edge.
+The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or full raw graph edge.
 
 ## V0.1 Scope
 

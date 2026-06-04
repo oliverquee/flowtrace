@@ -91,6 +91,9 @@ def main(argv: list[str] | None = None) -> int:
 
     for path in written_files:
         print(f"Generated {Path(path)}")
+    html_report = next((Path(path) for path in written_files if Path(path).name == "report.html"), None)
+    if html_report:
+        print(f"Open HTML report: {html_report}")
     return 0
 
 
