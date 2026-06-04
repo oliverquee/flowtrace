@@ -31,10 +31,24 @@ class RuntimeTraceResult:
     project_root: str
     events: list[RuntimeEvent] = field(default_factory=list)
     errors: list[RuntimeEvent] = field(default_factory=list)
+    runtime_attempted: bool = True
+    runtime_skipped: bool = False
+    runtime_skipped_reason: str | None = None
     completed: bool = True
 
 
-def run_with_trace(entry_path: Path, project_root: Path) -> RuntimeTraceResult:
+def skipped_runtime_result(entry_path: Path, project_root: Path, reason: str) -> RuntimeTraceResult:
+    return RuntimeTraceResult(
+        entry=str(entry_path),
+        project_root=str(project_root),
+        runtime_attempted=False,
+        runtime_skipped=True,
+        runtime_skipped_reason=reason,
+        completed=False,
+    )
+
+
+def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] | None = None) -> RuntimeTraceResult:
     result = RuntimeTraceResult(entry=str(entry_path), project_root=str(project_root))
     previous_trace = sys.gettrace()
     previous_argv = sys.argv[:]
@@ -94,7 +108,7 @@ def run_with_trace(entry_path: Path, project_root: Path) -> RuntimeTraceResult:
 
     try:
         sys.path = [str(entry_path.parent), str(project_root), *previous_path]
-        sys.argv = [str(entry_path)]
+        sys.argv = [str(entry_path), *(target_args or [])]
         sys.settrace(tracer)
         runpy.run_path(str(entry_path), run_name="__main__")
     except BaseException as exc:

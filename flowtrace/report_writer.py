@@ -56,6 +56,17 @@ def _write_json(path: Path, value: Any) -> None:
 
 
 def _runtime_jsonl(runtime_result: RuntimeTraceResult) -> str:
+    if runtime_result.runtime_skipped:
+        return json.dumps(
+            {
+                "event": "runtime_skipped",
+                "runtime_attempted": runtime_result.runtime_attempted,
+                "runtime_skipped": runtime_result.runtime_skipped,
+                "runtime_skipped_reason": runtime_result.runtime_skipped_reason,
+                "completed": runtime_result.completed,
+            },
+            sort_keys=True,
+        ) + "\n"
     return "\n".join(json.dumps(event.__dict__, sort_keys=True) for event in runtime_result.events) + "\n"
 
 
@@ -76,7 +87,10 @@ def _build_markdown_report(
         f"- Project root: `{project_root}`",
         f"- Python files scanned: {len(static_result.files)}",
         f"- Functions found: {len(static_result.functions)}",
+        f"- Runtime attempted: {runtime_result.runtime_attempted}",
         f"- Runtime completed: {runtime_result.completed}",
+        f"- Runtime skipped: {runtime_result.runtime_skipped}",
+        f"- Runtime skipped reason: {runtime_result.runtime_skipped_reason or 'None'}",
         "",
         "## 2. Entry file",
         f"- `{relative_path(entry_path, project_root)}`",
@@ -113,10 +127,7 @@ def _build_markdown_report(
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),
         "",
         "## 11. Runtime errors",
-        *_items(
-            f"{item['error_type']}: {item['error_message']} at {item['file']}:{item['line']}"
-            for item in diagnostics.runtime_error_path
-        ),
+        *_runtime_error_items(diagnostics.runtime_error_path),
         "",
         "## 12. Mermaid diagram location",
         f"- `{flow_path}`",
@@ -167,6 +178,42 @@ def _items(values: Any) -> list[str]:
     if not items:
         return ["- None"]
     return [f"- {item}" for item in items]
+
+
+def _runtime_error_items(errors: list[dict[str, str | int | None]]) -> list[str]:
+    if not errors:
+        return ["- None"]
+
+    grouped: dict[tuple[str | None, str | None], list[dict[str, str | int | None]]] = {}
+    for error in errors:
+        key = (error.get("error_type"), error.get("error_message"))
+        grouped.setdefault(key, []).append(error)
+
+    lines: list[str] = []
+    for (error_type, error_message), group in grouped.items():
+        lines.append(f"- {_error_label(error_type)}: {error_type}: {error_message} ({len(group)} occurrence(s))")
+        for item in group:
+            lines.append(f"-   at {item['function']} in {item['file']}:{item['line']}")
+        hint = _error_hint(error_type)
+        if hint:
+            lines.append(f"-   Hint: {hint}")
+    return lines
+
+
+def _error_label(error_type: str | None) -> str:
+    if error_type in {"ModuleNotFoundError", "ImportError"}:
+        return "Dependency/import error"
+    if error_type == "KeyboardInterrupt":
+        return "Runtime interrupted"
+    return "Runtime error"
+
+
+def _error_hint(error_type: str | None) -> str | None:
+    if error_type in {"ModuleNotFoundError", "ImportError"}:
+        return "Install the missing package in the Python environment used to run FlowTrace."
+    if error_type == "KeyboardInterrupt":
+        return "Target program may have waited for input/auth or was manually stopped."
+    return None
 
 
 def _mermaid_id(value: str) -> str:

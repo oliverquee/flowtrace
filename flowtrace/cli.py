@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 from pathlib import Path
 
 from .diagnostics import build_diagnostics
 from .graph_builder import build_runtime_graph, build_static_graph
 from .intended_flow import compare_intended_flow
 from .report_writer import write_reports
-from .runtime_tracer import run_with_trace
+from .runtime_tracer import run_with_trace, skipped_runtime_result
 from .static_analyzer import analyze_project
 from .utils import FlowTraceError, resolve_entry_path, resolve_output_dir, resolve_project_root
 
@@ -30,6 +31,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--intended-flow",
         help="Optional JSON file describing expected runtime function order.",
     )
+    parser.add_argument(
+        "--static-only",
+        action="store_true",
+        help="Analyze only; do not execute the target script.",
+    )
+    parser.add_argument(
+        "--target-args",
+        default="",
+        help="Arguments to pass to the target script, parsed without shell execution.",
+    )
     parser.add_argument("--output-dir", dest="output", help=argparse.SUPPRESS)
     return parser
 
@@ -44,7 +55,18 @@ def main(argv: list[str] | None = None) -> int:
         output_dir = resolve_output_dir(args.output)
 
         static_result = analyze_project(project_root, entry_path)
-        runtime_result = run_with_trace(entry_path, project_root)
+        try:
+            target_args = shlex.split(args.target_args) if args.target_args else []
+        except ValueError as exc:
+            raise FlowTraceError(f"Could not parse --target-args: {exc}") from exc
+        if args.static_only:
+            runtime_result = skipped_runtime_result(
+                entry_path,
+                project_root,
+                "Static-only mode requested",
+            )
+        else:
+            runtime_result = run_with_trace(entry_path, project_root, target_args)
         intended_comparison = compare_intended_flow(args.intended_flow, runtime_result)
         diagnostics = build_diagnostics(static_result, runtime_result)
         static_graph = build_static_graph(static_result, diagnostics)

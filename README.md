@@ -10,10 +10,30 @@ V0.1 is intentionally small and standard-library-only. It parses Python files wi
 python -m flowtrace.cli --entry sample_project\main.py
 ```
 
+Runtime mode executes the target script. Use it only when you are comfortable with the target code running normally, including side effects such as writing files, sending messages, accessing email APIs, making network calls, prompting for auth, or waiting for input.
+
 Optional project root and output directory:
 
 ```powershell
 python -m flowtrace.cli --entry sample_project\main.py --project-root sample_project --output flowtrace_output
+```
+
+## Static-Only Usage
+
+Use static-only mode for real projects that may send email, create drafts, call Telegram, require auth, write logs, or wait for user input.
+
+```powershell
+python -m flowtrace.cli --entry sample_project\main.py --static-only
+```
+
+Static-only mode still writes all report files, but marks runtime as skipped.
+
+## Target Args Usage
+
+Pass arguments to the target script without shell execution:
+
+```powershell
+python -m flowtrace.cli --entry project\main.py --target-args "scan-inbox --limit 5"
 ```
 
 ## Error Case Usage
@@ -25,6 +45,16 @@ python -m flowtrace.cli --entry sample_project\error_case.py
 ```
 
 The generated `report.md` shows `Runtime completed: False` and lists the runtime error path.
+
+Dependency or import failures are labeled in the report:
+
+```powershell
+python -m flowtrace.cli --entry sample_project\import_error_case.py
+```
+
+FlowTrace reports `Dependency/import error` and suggests installing the missing package in the Python environment used to run FlowTrace.
+
+If a target run is interrupted, FlowTrace labels it `Runtime interrupted` and notes that the target may have waited for input/auth or was manually stopped.
 
 ## Intended Flow Usage
 
@@ -65,6 +95,8 @@ Intended flow comparison ignores module-level runtime events such as `main.<modu
 - Runs the entry script with runtime tracing.
 - Captures project-local function enter, exit, error, and caller to callee relationships.
 - Handles runtime errors and still writes reports.
+- Supports static-only analysis for safer first passes on real projects.
+- Supports simple target argument passthrough with `--target-args`.
 
 ## Constraints
 
@@ -76,5 +108,7 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - Imported local calls are resolved for simple cases such as `from worker import build_message`.
 - Dynamic imports, monkey patching, decorators, aliases through containers, and complex package layouts may not resolve perfectly.
 - Runtime tracing only records functions inside the selected project root.
+- Runtime mode executes target code and can trigger target side effects.
+- Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual and does not include a visual editor.

@@ -8,6 +8,7 @@ from .static_analyzer import StaticAnalysisResult
 
 
 PROGRAM_START = "PROGRAM_START"
+RUNTIME_SKIPPED = "RUNTIME_SKIPPED"
 
 
 def build_static_graph(static_result: StaticAnalysisResult, diagnostics: DiagnosticsResult) -> dict[str, object]:
@@ -32,6 +33,15 @@ def build_runtime_graph(runtime_result: RuntimeTraceResult) -> dict[str, object]
     edges: dict[tuple[str, str], int] = {}
     call_order: list[str] = []
 
+    if runtime_result.runtime_skipped:
+        nodes[RUNTIME_SKIPPED] = {
+            "id": RUNTIME_SKIPPED,
+            "file": "",
+            "kind": "status",
+            "reason": runtime_result.runtime_skipped_reason or "",
+        }
+        edges[(PROGRAM_START, RUNTIME_SKIPPED)] = 1
+
     for event in runtime_result.events:
         nodes[event.function] = {"id": event.function, "file": event.file}
         if event.event == "function_enter":
@@ -44,6 +54,9 @@ def build_runtime_graph(runtime_result: RuntimeTraceResult) -> dict[str, object]
     return {
         "entry": runtime_result.entry,
         "project_root": runtime_result.project_root,
+        "runtime_attempted": runtime_result.runtime_attempted,
+        "runtime_skipped": runtime_result.runtime_skipped,
+        "runtime_skipped_reason": runtime_result.runtime_skipped_reason,
         "completed": runtime_result.completed,
         "nodes": list(nodes.values()),
         "edges": [
