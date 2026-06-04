@@ -67,33 +67,25 @@ def _document(
             f"<title>{_e(title)}</title>",
             f"<style>{_css()}</style>",
             "</head>",
-            "<body>",
+            '<body id="top">',
             "<main>",
-            f"<header><h1>{_e(title)}</h1><p>Static local report. No external resources are loaded.</p></header>",
+            f"<header><h1>{_e(title)}</h1><p>Static local report. No external resources are loaded.</p>{_quick_status_badges(runtime_result, comparison, risk_groups)}</header>",
+            _table_of_contents(),
             _summary_cards(entry_path, project_root, static_result, runtime_result, diagnostics, comparison, risk_groups),
-            _section("Recommended next checks", _list(_recommended_next_checks(runtime_result, risk_groups, comparison)), open_=True),
-            _section("Project summary", _key_values(_project_summary(project_root, runtime_result)), open_=True),
-            _section("Top risks", _side_effect_table(top_risks), open_=True),
-            _section("Static vs runtime comparison", _comparison_html(comparison), open_=True),
-            _section("Runtime flowchart", _runtime_flowchart_html(runtime_result, runtime_graph), open_=True),
-            _section("High-risk side effects", _side_effect_table(risk_groups["high"]), open_=True),
-            _section("Medium-risk side effects", _side_effect_table(risk_groups["medium"]), open_=False),
-            _section("Low-risk side effects", _side_effect_table(risk_groups["low"]), open_=False),
-            _section("Runtime errors", _runtime_errors_html(diagnostics.runtime_error_path), open_=True),
-            _section("Runtime call order", _numbered(executed), open_=False),
-            _section("Intended flow comparison", _intended_flow_html(intended_comparison), open_=False),
-            _section("Legacy unexecuted function diagnostics", _legacy_unexecuted(runtime_result, diagnostics), open_=False),
-            _section("Assigned variables never read", _assignments_html(diagnostics), open_=False),
-            _section("Entry file", f"<p><code>{_e(relative_path(entry_path, project_root))}</code></p>", open_=False),
-            _section("Files scanned", _list(file.path for file in static_result.files), open_=False),
-            _section("Imports found", _list(_format_import(item) for item in static_result.imports), open_=False),
-            _section(
-                "Functions found",
-                _list(f"{item.id}({', '.join(item.args)}) at {item.file}:{item.line}" for item in static_result.functions),
-                open_=False,
-            ),
-            _section("Functions executed", _list(dict.fromkeys(executed).keys()), open_=False),
-            _section("Mermaid diagram location", f"<p><code>{_e(str(flow_path))}</code></p>", open_=False),
+            _section("recommended-next-checks", "Recommended next checks", _list(_recommended_next_checks(runtime_result, risk_groups, comparison)), open_=True),
+            _section("project-summary", "Project summary", _key_values(_project_summary(project_root, runtime_result)), open_=True),
+            _section("top-risks", "Top risks", _side_effect_table(top_risks), open_=True),
+            _section("static-vs-runtime-comparison", "Static vs runtime comparison", _comparison_html(comparison), open_=True),
+            _section("runtime-flowchart", "Runtime flowchart", _runtime_flowchart_html(runtime_result, runtime_graph), open_=True),
+            _section("high-risk-side-effects", "High-risk side effects", _side_effect_table(risk_groups["high"]), open_=True),
+            _section("medium-risk-side-effects", "Medium-risk side effects", _side_effect_table(risk_groups["medium"]), open_=False),
+            _section("low-risk-side-effects", "Low-risk side effects", _side_effect_table(risk_groups["low"]), open_=False),
+            _section("runtime-errors", "Runtime errors", _runtime_errors_html(diagnostics.runtime_error_path), open_=True),
+            _section("runtime-call-order", "Runtime call order", _numbered(executed), open_=False),
+            _section("intended-flow-comparison", "Intended flow comparison", _intended_flow_html(intended_comparison), open_=False),
+            _section("legacy-unexecuted-function-diagnostics", "Legacy unexecuted function diagnostics", _legacy_unexecuted(runtime_result, diagnostics), open_=False),
+            _section("assigned-variables-never-read", "Assigned variables never read", _assignments_html(diagnostics), open_=False),
+            _section("technical-inventory", "Technical inventory", _technical_inventory_html(entry_path, project_root, static_result, flow_path, executed), open_=False),
             "</main>",
             "</body>",
             "</html>",
@@ -129,12 +121,94 @@ def _summary_cards(
         ("Risky unexecuted functions", str(len(comparison.risky_unexecuted_functions))),
     ]
     cards = "".join(f"<div class='card'><span>{_e(label)}</span><strong>{_e(value)}</strong></div>" for label, value in values)
-    return f"<section class='summary'><h2>Executive summary</h2><div class='cards'>{cards}</div></section>"
+    return f"<section id='executive-summary' class='summary'><h2>Executive summary</h2><div class='cards'>{cards}</div>{_back_to_top()}</section>"
 
 
-def _section(title: str, body: str, open_: bool) -> str:
+def _section(section_id: str, title: str, body: str, open_: bool) -> str:
     open_attr = " open" if open_ else ""
-    return f"<details{open_attr}><summary>{_e(title)}</summary><div class='section-body'>{body}</div></details>"
+    return f"<details id='{_e(section_id)}'{open_attr}><summary>{_e(title)}</summary><div class='section-body'><h2>{_e(title)}</h2>{body}{_back_to_top()}</div></details>"
+
+
+def _table_of_contents() -> str:
+    links = [
+        ("executive-summary", "Executive summary"),
+        ("recommended-next-checks", "Recommended next checks"),
+        ("project-summary", "Project summary"),
+        ("top-risks", "Top risks"),
+        ("static-vs-runtime-comparison", "Static vs runtime comparison"),
+        ("runtime-flowchart", "Runtime flowchart"),
+        ("high-risk-side-effects", "High-risk side effects"),
+        ("medium-risk-side-effects", "Medium-risk side effects"),
+        ("low-risk-side-effects", "Low-risk side effects"),
+        ("runtime-errors", "Runtime errors"),
+        ("runtime-call-order", "Runtime call order"),
+        ("intended-flow-comparison", "Intended flow comparison"),
+        ("assigned-variables-never-read", "Assigned variables never read"),
+        ("technical-inventory", "Technical inventory"),
+    ]
+    items = "".join(f"<li><a href='#{_e(anchor)}'>{_e(label)}</a></li>" for anchor, label in links)
+    return f"<nav class='toc' aria-label='Report sections'><h2>Table of contents</h2><ul>{items}</ul></nav>"
+
+
+def _quick_status_badges(
+    runtime_result: RuntimeTraceResult,
+    comparison: StaticRuntimeComparison,
+    risk_groups: dict[str, list[SideEffectRecord]],
+) -> str:
+    if runtime_result.runtime_skipped:
+        runtime_status = "skipped"
+    elif not runtime_result.runtime_attempted:
+        runtime_status = "not attempted"
+    elif runtime_result.completed:
+        runtime_status = "completed"
+    else:
+        runtime_status = "error"
+
+    if comparison.comparison_unavailable:
+        comparison_status = "unavailable"
+    elif comparison.partial_runtime:
+        comparison_status = "partial"
+    else:
+        comparison_status = "available"
+
+    badges = [
+        ("Runtime", runtime_status),
+        ("Risk", f"{len(risk_groups['high'])} high-risk"),
+        ("Comparison", comparison_status),
+        ("HTML", "static local/no external resources"),
+    ]
+    return "<div class='status-badges'>" + "".join(
+        f"<span class='status-badge'><strong>{_e(label)}:</strong> {_e(value)}</span>" for label, value in badges
+    ) + "</div>"
+
+
+def _technical_inventory_html(
+    entry_path: Path,
+    project_root: Path,
+    static_result: StaticAnalysisResult,
+    flow_path: Path,
+    executed: list[str],
+) -> str:
+    sections = [
+        _subsection("Entry file", f"<p><code>{_e(relative_path(entry_path, project_root))}</code></p>"),
+        _subsection("Files scanned", _list(file.path for file in static_result.files)),
+        _subsection("Imports found", _list(_format_import(item) for item in static_result.imports)),
+        _subsection(
+            "Functions found",
+            _list(f"{item.id}({', '.join(item.args)}) at {item.file}:{item.line}" for item in static_result.functions),
+        ),
+        _subsection("Functions executed", _list(dict.fromkeys(executed).keys())),
+        _subsection("Mermaid diagram location", f"<p><code>{_e(str(flow_path))}</code></p>"),
+    ]
+    return "".join(sections)
+
+
+def _subsection(title: str, body: str) -> str:
+    return f"<details class='subsection'><summary>{_e(title)}</summary><div class='section-body'><h3>{_e(title)}</h3>{body}</div></details>"
+
+
+def _back_to_top() -> str:
+    return "<p class='back-top'><a href='#top'>Back to top</a></p>"
 
 
 def _project_summary(project_root: Path, runtime_result: RuntimeTraceResult) -> list[tuple[str, str]]:
@@ -521,13 +595,19 @@ body{margin:0;background:#f7f8fb;color:#1f2937;font:15px/1.5 system-ui,-apple-sy
 main{max-width:1180px;margin:0 auto;padding:28px}
 header{border-bottom:1px solid #d8dee9;margin-bottom:18px}
 h1{margin:0 0 6px;font-size:30px} h2{font-size:20px} h3{font-size:16px;margin-top:18px}
+a{color:#1d4ed8;text-decoration:none}a:hover{text-decoration:underline}
 code{font-family:Consolas,Menlo,monospace;background:#eef2f7;padding:1px 4px;border-radius:4px}
+.status-badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
+.status-badge{border:1px solid #d8dee9;border-radius:999px;background:#fff;padding:4px 10px;font-size:13px}
+.toc{background:#fff;border:1px solid #d8dee9;border-radius:8px;padding:14px 18px;margin-bottom:14px}
+.toc h2{margin-top:0}.toc ul{columns:2;list-style:none;padding:0;margin:0}.toc li{break-inside:avoid;margin:5px 0}
 .summary{background:#fff;border:1px solid #d8dee9;border-radius:8px;padding:18px;margin-bottom:14px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
 .card{border:1px solid #e1e6ef;border-radius:8px;padding:10px;background:#fbfcff}
 .card span{display:block;color:#667085;font-size:12px}.card strong{display:block;overflow-wrap:anywhere}
 details{background:#fff;border:1px solid #d8dee9;border-radius:8px;margin:12px 0}
 summary{cursor:pointer;font-weight:700;padding:12px 14px}.section-body{padding:0 14px 14px}
+.subsection{background:#fbfcff;margin:8px 0}.back-top{font-size:13px;margin-top:14px}
 table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;border-bottom:1px solid #edf0f5;padding:7px;vertical-align:top}
 .kv th{width:260px;color:#667085}.badge{display:inline-block;border-radius:999px;padding:2px 8px;font-weight:700;font-size:12px}
 .high{background:#fee2e2;color:#991b1b}.medium{background:#fef3c7;color:#92400e}.low{background:#dcfce7;color:#166534}
@@ -536,4 +616,17 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .flowchart-wrap{overflow-x:auto;border:1px solid #e1e6ef;border-radius:8px;background:#fff;margin-top:10px}
 .runtime-flowchart{display:block;min-width:530px;max-width:100%;height:auto}
 li{margin:3px 0;overflow-wrap:anywhere}
+@media print{
+body{background:#fff;color:#111827;font-size:12px}
+main{max-width:none;padding:12px}
+header,.summary,.toc,details,.card,table{break-inside:avoid;page-break-inside:avoid}
+details{border-color:#cbd5e1}
+details:not([open])>.section-body{display:block}
+summary{cursor:default}
+a{color:#111827;text-decoration:none}
+.back-top{display:none}
+.toc ul{columns:2}
+.flowchart-wrap{overflow:visible}
+.runtime-flowchart{min-width:0;width:100%}
+}
 """.strip()
