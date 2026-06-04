@@ -452,19 +452,55 @@ def _runtime_errors_html(errors: list[dict[str, str | int | None]]) -> str:
 
 
 def _intended_flow_html(comparison) -> str:
+    status_class = f"flow-status {comparison.status}"
     return "".join(
         [
-            _key_values([("Name", comparison.name or "None"), ("Order mismatch summary", comparison.order_mismatch_summary)]),
+            f"<p><span class='{_e(status_class)}'>Status: {_e(comparison.status)}</span></p>",
+            f"<p class='hint'><strong>Summary:</strong> {_e(comparison.summary)}</p>",
+            _key_values(
+                [
+                    ("Name", comparison.name or "None"),
+                    ("Validation result", "ok" if comparison.validation_ok else "failed"),
+                    ("Comparison available", str(comparison.comparison_available)),
+                    ("Comparison unavailable reason", comparison.comparison_unavailable_reason or "None"),
+                    ("Partial runtime", str(comparison.partial_runtime)),
+                    ("First mismatch index", str(comparison.first_mismatch_index) if comparison.first_mismatch_index is not None else "None"),
+                ]
+            ),
+            _list(["Runtime did not complete; intended-flow comparison is based on partial runtime trace."] if comparison.partial_runtime else []),
+            "<h3>Validation errors</h3>",
+            _list(comparison.validation_errors),
             "<h3>Expected order</h3>",
             _list(comparison.expected_runtime_order),
             "<h3>Actual order</h3>",
             _list(comparison.actual_runtime_order),
+            "<h3>Matched functions</h3>",
+            _list(comparison.matched_functions),
             "<h3>Missing expected functions</h3>",
             _list(comparison.missing_expected_functions),
             "<h3>Unexpected actual functions</h3>",
             _list(comparison.unexpected_actual_functions),
+            "<h3>Order mismatches</h3>",
+            _order_mismatch_table(comparison.order_mismatches),
         ]
     )
+
+
+def _order_mismatch_table(items) -> str:
+    if not items:
+        return "<p>None</p>"
+    rows = []
+    for item in items:
+        rows.append(
+            "<tr>"
+            f"<td>{_e(item.expected_index)}</td>"
+            f"<td><code>{_e(item.expected_function)}</code></td>"
+            f"<td>{_e(item.actual_index if item.actual_index is not None else 'None')}</td>"
+            f"<td><code>{_e(item.actual_function if item.actual_function is not None else 'None')}</code></td>"
+            f"<td>{_e(item.message)}</td>"
+            "</tr>"
+        )
+    return "<table><thead><tr><th>Expected index</th><th>Expected</th><th>Actual index</th><th>Actual</th><th>Message</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
 
 
 def _legacy_unexecuted(runtime_result: RuntimeTraceResult, diagnostics: DiagnosticsResult) -> str:
@@ -599,6 +635,9 @@ a{color:#1d4ed8;text-decoration:none}a:hover{text-decoration:underline}
 code{font-family:Consolas,Menlo,monospace;background:#eef2f7;padding:1px 4px;border-radius:4px}
 .status-badges{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 16px}
 .status-badge{border:1px solid #d8dee9;border-radius:999px;background:#fff;padding:4px 10px;font-size:13px}
+.flow-status{display:inline-block;border:1px solid #d8dee9;border-radius:999px;padding:3px 10px;font-weight:700;font-size:13px}
+.flow-status.matched{background:#dcfce7;color:#166534}.flow-status.mismatch{background:#fef3c7;color:#92400e}
+.flow-status.invalid{background:#fee2e2;color:#991b1b}.flow-status.unavailable{background:#e0f2fe;color:#075985}
 .toc{background:#fff;border:1px solid #d8dee9;border-radius:8px;padding:14px 18px;margin-bottom:14px}
 .toc h2{margin-top:0}.toc ul{columns:2;list-style:none;padding:0;margin:0}.toc li{break-inside:avoid;margin:5px 0}
 .summary{background:#fff;border:1px solid #d8dee9;border-radius:8px;padding:18px;margin-bottom:14px}

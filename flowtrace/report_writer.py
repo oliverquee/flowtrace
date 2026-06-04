@@ -180,16 +180,7 @@ def _build_markdown_report(
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),
         "",
         "## 11. Intended flow comparison",
-        f"- Name: `{intended_comparison.name or 'None'}`",
-        "- Expected order:",
-        *_items(intended_comparison.expected_runtime_order),
-        "- Actual order:",
-        *_items(intended_comparison.actual_runtime_order),
-        "- Missing expected functions:",
-        *_items(intended_comparison.missing_expected_functions),
-        "- Unexpected actual functions:",
-        *_items(intended_comparison.unexpected_actual_functions),
-        f"- Order mismatch summary: {intended_comparison.order_mismatch_summary}",
+        *_intended_flow_items(intended_comparison),
         "",
         "## 12. Legacy unexecuted function diagnostics",
         "- Prefer `## 5. Static vs runtime comparison` for detailed execution comparison.",
@@ -374,6 +365,44 @@ def _runtime_error_items(errors: list[dict[str, str | int | None]]) -> list[str]
         if hint:
             lines.append(f"-   Hint: {hint}")
     return lines
+
+
+def _intended_flow_items(comparison: IntendedFlowComparison) -> list[str]:
+    lines = [
+        f"- Status: `{comparison.status}`",
+        f"- Name: `{comparison.name or 'None'}`",
+        f"- Validation result: {'ok' if comparison.validation_ok else 'failed'}",
+        f"- Comparison available: {comparison.comparison_available}",
+        f"- Comparison unavailable reason: {comparison.comparison_unavailable_reason or 'None'}",
+        f"- Partial runtime: {comparison.partial_runtime}",
+        f"- Summary: {comparison.summary}",
+        f"- First mismatch index: {comparison.first_mismatch_index if comparison.first_mismatch_index is not None else 'None'}",
+        *_items(["Runtime did not complete; intended-flow comparison is based on partial runtime trace."] if comparison.partial_runtime else []),
+        "- Validation errors:",
+        *_items(comparison.validation_errors),
+        "- Expected order:",
+        *_items(comparison.expected_runtime_order),
+        "- Actual order:",
+        *_items(comparison.actual_runtime_order),
+        "- Matched functions:",
+        *_items(comparison.matched_functions),
+        "- Missing expected functions:",
+        *_items(comparison.missing_expected_functions),
+        "- Unexpected actual functions:",
+        *_items(comparison.unexpected_actual_functions),
+        "- Order mismatches:",
+        *_items(_format_order_mismatch(item) for item in comparison.order_mismatches),
+    ]
+    return lines
+
+
+def _format_order_mismatch(item: Any) -> str:
+    if hasattr(item, "message"):
+        return (
+            f"expected_index={item.expected_index}, expected={item.expected_function}, "
+            f"actual_index={item.actual_index}, actual={item.actual_function}, message={item.message}"
+        )
+    return str(item)
 
 
 def _error_label(error_type: str | None) -> str:

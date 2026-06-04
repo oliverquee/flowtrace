@@ -77,7 +77,7 @@ You can compare the actual runtime order against a small JSON expectation file:
 python -m flowtrace.cli --entry sample_project\main.py --intended-flow sample_project\intended_flow.json
 ```
 
-Expected flow format:
+Intended flow JSON format:
 
 ```json
 {
@@ -90,6 +90,21 @@ Expected flow format:
 ```
 
 Intended flow comparison ignores module-level runtime events such as `main.<module>` by default. Raw runtime outputs still keep those events.
+
+FlowTrace validates intended-flow JSON before comparing. The file must exist, be valid JSON, use an object as the root, use an optional string `name`, and include `expected_runtime_order` as a list of non-empty strings. If validation fails, FlowTrace still writes `report.md` and `report.html`; the intended-flow section shows `invalid` status and the validation errors.
+
+Static-only mode validates the intended-flow file but marks execution comparison as unavailable because the target was not run. It does not report false missing or unexpected functions from an empty runtime trace.
+
+If runtime starts but fails, intended-flow comparison uses the partial runtime trace and notes that the comparison is partial.
+
+Sample intended-flow checks:
+
+```powershell
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham" --intended-flow sample_project\intended_flow_exact.json
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham" --intended-flow sample_project\intended_flow_missing.json
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham" --intended-flow sample_project\intended_flow_wrong_order.json
+python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham" --intended-flow sample_project\intended_flow_invalid.json
+```
 
 ## Static Vs Runtime Comparison
 
@@ -152,4 +167,4 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - HTML flowcharts are simplified best-effort SVG diagrams, not a visual editor.
 - Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.
-- Intended flow comparison is textual and does not include a visual editor.
+- Intended flow comparison is textual, best effort, validates JSON inputs, and does not include a visual editor.
