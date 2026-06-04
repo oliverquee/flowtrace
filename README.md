@@ -46,6 +46,8 @@ Expected flow format:
 }
 ```
 
+Intended flow comparison ignores module-level runtime events such as `main.<module>` by default. Raw runtime outputs still keep those events.
+
 ## Outputs
 
 - `flowtrace_output/static_graph.json`
@@ -74,4 +76,5 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - Imported local calls are resolved for simple cases such as `from worker import build_message`.
 - Dynamic imports, monkey patching, decorators, aliases through containers, and complex package layouts may not resolve perfectly.
 - Runtime tracing only records functions inside the selected project root.
+- Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual and does not include a visual editor.

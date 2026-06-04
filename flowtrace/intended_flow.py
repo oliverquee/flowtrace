@@ -33,7 +33,9 @@ class IntendedFlowComparison:
 
 def compare_intended_flow(path: str | Path | None, runtime_result: RuntimeTraceResult) -> IntendedFlowComparison:
     actual_order = [
-        event.function for event in runtime_result.events if event.event == "function_enter"
+        event.function
+        for event in runtime_result.events
+        if event.event == "function_enter" and not event.function.endswith(".<module>")
     ]
     if not path:
         return IntendedFlowComparison(actual_runtime_order=actual_order)
