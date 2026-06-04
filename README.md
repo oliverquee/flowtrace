@@ -105,9 +105,12 @@ If runtime starts but fails, FlowTrace keeps a partial comparison based on the r
 - `flowtrace_output/runtime_trace.jsonl`
 - `flowtrace_output/runtime_graph.json`
 - `flowtrace_output/report.md`
+- `flowtrace_output/report.html`
 - `flowtrace_output/flow.mmd`
 
 The markdown report is organized for review: summary, recommended checks, project status, top risks, static-vs-runtime comparison, risk sections, then technical inventory. It may suppress obvious low-value call noise in markdown.
+
+The HTML report is a static local file with inline CSS, native collapsible sections, and no external resources, JavaScript, CDN, server, or network calls.
 
 The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or graph edge.
 
@@ -123,6 +126,7 @@ The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trac
 - Supports static-only analysis for safer first passes on real projects.
 - Supports simple target argument passthrough with `--target-args`.
 - Reports parsed target args and a shell-like display string.
+- Generates both `report.md` and static local `report.html`.
 
 ## Constraints
 
@@ -138,6 +142,7 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - CLI-style projects should usually be run with `--target-args` so runtime tracing reaches the intended command path.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Markdown reports are curated for readability and ordered from summary to risks to comparison to technical inventory; JSON outputs remain the source for complete raw data.
+- HTML reports are static local files with inline CSS and no external resources.
 - Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual and does not include a visual editor.

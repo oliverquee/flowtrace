@@ -5,6 +5,7 @@
 - Current stable branch: main
 - Current stable version: V0.1.6
 - Latest stable commit: 3fced47
+- V0.2 is in progress on feature branches for a lightweight local HTML report viewer.
 
 ## Current Tested Commands
 

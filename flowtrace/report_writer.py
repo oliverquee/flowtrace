@@ -8,6 +8,7 @@ from typing import Any
 
 from .comparison import StaticRuntimeComparison, StaticCallNotObserved, RiskyUnexecutedFunction
 from .diagnostics import DiagnosticsResult
+from .html_report_writer import write_html_report
 from .intended_flow import IntendedFlowComparison
 from .runtime_tracer import RuntimeTraceResult, target_args_display
 from .static_analyzer import SideEffectRecord, StaticAnalysisResult
@@ -32,6 +33,7 @@ def write_reports(
     runtime_trace_path = output_dir / "runtime_trace.jsonl"
     runtime_graph_path = output_dir / "runtime_graph.json"
     report_path = output_dir / "report.md"
+    html_report_path = output_dir / "report.html"
     flow_path = output_dir / "flow.mmd"
 
     _write_json(static_graph_path, static_graph)
@@ -50,8 +52,19 @@ def write_reports(
         ),
         encoding="utf-8",
     )
+    write_html_report(
+        path=html_report_path,
+        entry_path=entry_path,
+        project_root=project_root,
+        static_result=static_result,
+        runtime_result=runtime_result,
+        diagnostics=diagnostics,
+        flow_path=flow_path,
+        intended_comparison=intended_comparison,
+        static_runtime_comparison=static_runtime_comparison,
+    )
     flow_path.write_text(_build_mermaid(runtime_graph), encoding="utf-8")
-    return [static_graph_path, runtime_trace_path, runtime_graph_path, report_path, flow_path]
+    return [static_graph_path, runtime_trace_path, runtime_graph_path, report_path, flow_path, html_report_path]
 
 
 def _write_json(path: Path, value: Any) -> None:
