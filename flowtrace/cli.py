@@ -5,17 +5,27 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .engine import FlowTraceError, analyze_entry, write_outputs
+from .diagnostics import build_diagnostics
+from .graph_builder import build_runtime_graph, build_static_graph
+from .report_writer import write_reports
+from .runtime_tracer import run_with_trace
+from .static_analyzer import analyze_project
+from .utils import FlowTraceError, resolve_entry_path, resolve_output_dir, resolve_project_root
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Trace a Python entry file.")
+    parser = argparse.ArgumentParser(description="Analyze and run a Python entry file.")
     parser.add_argument("--entry", required=True, help="Python file to analyze.")
     parser.add_argument(
-        "--output-dir",
-        default="flowtrace_output",
-        help="Directory for generated trace output.",
+        "--project-root",
+        help="Project root to scan. Defaults to the parent folder of --entry.",
     )
+    parser.add_argument(
+        "--output",
+        default="flowtrace_output",
+        help="Directory for generated FlowTrace reports.",
+    )
+    parser.add_argument("--output-dir", dest="output", help=argparse.SUPPRESS)
     return parser
 
 
@@ -24,8 +34,25 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     try:
-        result = analyze_entry(args.entry)
-        written_files = write_outputs(result, args.output_dir)
+        entry_path = resolve_entry_path(args.entry)
+        project_root = resolve_project_root(entry_path, args.project_root)
+        output_dir = resolve_output_dir(args.output)
+
+        static_result = analyze_project(project_root, entry_path)
+        runtime_result = run_with_trace(entry_path, project_root)
+        diagnostics = build_diagnostics(static_result, runtime_result)
+        static_graph = build_static_graph(static_result, diagnostics)
+        runtime_graph = build_runtime_graph(runtime_result)
+        written_files = write_reports(
+            output_dir=output_dir,
+            entry_path=entry_path,
+            project_root=project_root,
+            static_result=static_result,
+            runtime_result=runtime_result,
+            diagnostics=diagnostics,
+            static_graph=static_graph,
+            runtime_graph=runtime_graph,
+        )
     except FlowTraceError as exc:
         parser.exit(status=1, message=f"flowtrace: {exc}\n")
 
