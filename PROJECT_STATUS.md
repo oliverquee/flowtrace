@@ -3,9 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.1.5
-- Latest stable commit: 95e41e5
-- V0.1.6 is in progress on feature branches for report structure cleanup.
+- Current stable version: V0.1.6
+- Latest stable commit: 3fced47
 
 ## Current Tested Commands
 
