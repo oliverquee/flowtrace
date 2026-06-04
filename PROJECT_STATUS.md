@@ -3,9 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.1.6
-- Latest stable commit: 3fced47
-- V0.2 is in progress on feature branches for a lightweight local HTML report viewer.
+- Current stable version: V0.2
+- Latest stable commit: 98e75bb
 
 ## Current Tested Commands
 

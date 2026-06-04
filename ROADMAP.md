@@ -8,7 +8,7 @@ FlowTrace is a local-first Python code/workflow analyzer that compares intended 
 - V0.1.1: Real-project hardening basics
 - V0.1.2: Static-only safety mode and runtime diagnostics
 - V0.1.3: Summary-first risk-ranked markdown report
-- V0.2: Lightweight local HTML report viewer (in progress; not stable until merged)
+- V0.2: Lightweight local HTML report viewer
 
 ## Next Planned Versions
 
