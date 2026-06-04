@@ -10,6 +10,7 @@ from .comparison import StaticRuntimeComparison, StaticCallNotObserved, RiskyUne
 from .diagnostics import DiagnosticsResult
 from .html_report_writer import write_html_report
 from .intended_flow import IntendedFlowComparison
+from .node_details import build_node_details
 from .runtime_tracer import RuntimeTraceResult, target_args_display
 from .static_analyzer import SideEffectRecord, StaticAnalysisResult
 from .utils import relative_path
@@ -35,10 +36,19 @@ def write_reports(
     report_path = output_dir / "report.md"
     html_report_path = output_dir / "report.html"
     flow_path = output_dir / "flow.mmd"
+    node_details_path = output_dir / "node_details.json"
+    node_details = build_node_details(
+        static_result=static_result,
+        runtime_result=runtime_result,
+        runtime_graph=runtime_graph,
+        diagnostics=diagnostics,
+        intended_comparison=intended_comparison,
+    )
 
     _write_json(static_graph_path, static_graph)
     runtime_trace_path.write_text(_runtime_jsonl(runtime_result), encoding="utf-8")
     _write_json(runtime_graph_path, runtime_graph)
+    _write_json(node_details_path, node_details)
     report_path.write_text(
         _build_markdown_report(
             entry_path,
@@ -60,12 +70,13 @@ def write_reports(
         runtime_result=runtime_result,
         diagnostics=diagnostics,
         flow_path=flow_path,
+        node_details_path=node_details_path,
         runtime_graph=runtime_graph,
         intended_comparison=intended_comparison,
         static_runtime_comparison=static_runtime_comparison,
     )
     flow_path.write_text(_build_mermaid(runtime_graph), encoding="utf-8")
-    return [static_graph_path, runtime_trace_path, runtime_graph_path, report_path, flow_path, html_report_path]
+    return [static_graph_path, runtime_trace_path, runtime_graph_path, node_details_path, report_path, flow_path, html_report_path]
 
 
 def _write_json(path: Path, value: Any) -> None:

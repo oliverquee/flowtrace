@@ -119,6 +119,7 @@ If runtime starts but fails, FlowTrace keeps a partial comparison based on the r
 - `flowtrace_output/static_graph.json`
 - `flowtrace_output/runtime_trace.jsonl`
 - `flowtrace_output/runtime_graph.json`
+- `flowtrace_output/node_details.json`
 - `flowtrace_output/report.md`
 - `flowtrace_output/report.html`
 - `flowtrace_output/flow.mmd`
@@ -132,6 +133,8 @@ The HTML report is a static local file with inline CSS, native collapsible secti
 `report.html` includes a simple embedded static SVG runtime flowchart built from `runtime_graph.json` data. The diagram is simplified, best-effort, and is not a visual editor. Repeated runtime edges may be summarized with count labels such as `x3`. `flow.mmd` is still generated for Mermaid-compatible tools.
 
 The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or full raw graph edge.
+
+`node_details.json` enriches each meaningful node/function with source location, args, execution state, runtime call counts, incoming/outgoing static and runtime calls, side effects, risk level, diagnostics, and intended-flow role. It is the data foundation for future clickable graph review. `report.html` only links to this data for now; it remains static and is not yet interactive.
 
 ## V0.1 Scope
 
@@ -165,6 +168,7 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - HTML reports include anchor navigation and a grouped technical inventory lower in the page.
 - HTML report styling includes print/PDF-friendly rules for local export.
 - HTML flowcharts are simplified best-effort SVG diagrams, not a visual editor.
+- `node_details.json` prepares data for future clickable graph review, but FlowTrace does not include the interactive viewer yet.
 - Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual, best effort, validates JSON inputs, and does not include a visual editor.

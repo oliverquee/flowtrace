@@ -7,6 +7,7 @@
 - Latest stable commit: 903372c
 - V0.2.3 is in progress on feature branches for HTML report navigation and print/PDF usability.
 - V0.3 is in progress on feature branches for intended-flow validation and richer comparison results.
+- V0.4 is in progress on feature branches for clickable graph data foundations.
 
 ## Current Tested Commands
 
