@@ -9,7 +9,7 @@ from typing import Any
 from .diagnostics import DiagnosticsResult
 from .intended_flow import IntendedFlowComparison
 from .runtime_tracer import RuntimeTraceResult
-from .static_analyzer import StaticAnalysisResult
+from .static_analyzer import SideEffectRecord, StaticAnalysisResult
 from .utils import relative_path
 
 
@@ -80,59 +80,80 @@ def _build_markdown_report(
     intended_comparison: IntendedFlowComparison,
 ) -> str:
     executed = [event.function for event in runtime_result.events if event.event == "function_enter"]
+    risk_groups = _side_effects_by_risk(diagnostics.side_effect_calls)
+    top_risks = _top_risk_items(risk_groups)
     lines = [
         "# FlowTrace Report",
         "",
-        "## 1. Project summary",
+        "## 1. Executive summary",
         f"- Project root: `{project_root}`",
+        f"- Entry file: `{relative_path(entry_path, project_root)}`",
         f"- Python files scanned: {len(static_result.files)}",
         f"- Functions found: {len(static_result.functions)}",
         f"- Runtime attempted: {runtime_result.runtime_attempted}",
         f"- Runtime completed: {runtime_result.completed}",
         f"- Runtime skipped: {runtime_result.runtime_skipped}",
+        f"- Runtime error count: {len(diagnostics.runtime_error_path)}",
+        f"- High-risk side effect count: {len(risk_groups['high'])}",
+        f"- Medium-risk side effect count: {len(risk_groups['medium'])}",
+        f"- Low-risk side effect count: {len(risk_groups['low'])}",
+        f"- Defined-but-not-executed function count: {len(diagnostics.functions_defined_but_not_executed)}",
+        f"- Assigned-but-unread variable count: {len(diagnostics.assigned_variables_never_read)}",
+        "",
+        "### Top risks",
+        *_items(_format_side_effect(item) for item in top_risks),
+        "",
+        "## 2. Project summary",
+        f"- Project root: `{project_root}`",
+        f"- Runtime attempted: {runtime_result.runtime_attempted}",
+        f"- Runtime completed: {runtime_result.completed}",
+        f"- Runtime skipped: {runtime_result.runtime_skipped}",
         f"- Runtime skipped reason: {runtime_result.runtime_skipped_reason or 'None'}",
         "",
-        "## 2. Entry file",
+        "## 3. Entry file",
         f"- `{relative_path(entry_path, project_root)}`",
         "",
-        "## 3. Files scanned",
+        "## 4. Files scanned",
         *_items(file.path for file in static_result.files),
         "",
-        "## 4. Imports found",
+        "## 5. Imports found",
         *_items(_format_import(item) for item in static_result.imports),
         "",
-        "## 5. Functions found",
+        "## 6. Functions found",
         *_items(f"{item.id}({', '.join(item.args)}) at {item.file}:{item.line}" for item in static_result.functions),
         "",
-        "## 6. Functions executed",
+        "## 7. Functions executed",
         *_items(dict.fromkeys(executed).keys()),
         "",
-        "## 7. Functions defined but not executed",
+        "## 8. Functions defined but not executed",
         *_items(diagnostics.functions_defined_but_not_executed),
         "",
-        "## 8. Assigned variables never read",
+        "## 9. Assigned variables never read",
         *_items(
             f"{item.name} at {item.file}:{item.line} in {_scope_label(item.in_function)}"
             for item in diagnostics.assigned_variables_never_read
         ),
         "",
-        "## 9. Side-effect calls",
-        *_items(
-            f"{item.category}: {item.call} at {item.file}:{item.line}"
-            for item in diagnostics.side_effect_calls
-        ),
+        "## 10. High-risk side effects",
+        *_items(_format_side_effect(item) for item in risk_groups["high"]),
         "",
-        "## 10. Runtime call order",
+        "## 11. Medium-risk side effects",
+        *_items(_format_side_effect(item) for item in risk_groups["medium"]),
+        "",
+        "## 12. Low-risk side effects",
+        *_items(_filtered_low_risk_side_effects(risk_groups["low"])),
+        "",
+        "## 13. Runtime call order",
         "- Synthetic root: `PROGRAM_START`",
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),
         "",
-        "## 11. Runtime errors",
+        "## 14. Runtime errors",
         *_runtime_error_items(diagnostics.runtime_error_path),
         "",
-        "## 12. Mermaid diagram location",
+        "## 15. Mermaid diagram location",
         f"- `{flow_path}`",
         "",
-        "## 13. Intended flow comparison",
+        "## 16. Intended flow comparison",
         f"- Name: `{intended_comparison.name or 'None'}`",
         "- Expected order:",
         *_items(intended_comparison.expected_runtime_order),
@@ -214,6 +235,69 @@ def _error_hint(error_type: str | None) -> str | None:
     if error_type == "KeyboardInterrupt":
         return "Target program may have waited for input/auth or was manually stopped."
     return None
+
+
+def _side_effects_by_risk(side_effects: list[SideEffectRecord]) -> dict[str, list[SideEffectRecord]]:
+    groups: dict[str, list[SideEffectRecord]] = {"high": [], "medium": [], "low": []}
+    for item in side_effects:
+        groups[_side_effect_risk(item)].append(item)
+    return groups
+
+
+def _side_effect_risk(item: SideEffectRecord) -> str:
+    call = item.call.lower()
+    category = item.category
+
+    if category in {"file_delete", "process"}:
+        return "high"
+    if any(term in call for term in ("send", "send_message", "sendmail", "create_draft", "draft")):
+        return "high"
+    if any(term in call for term in ("gmail", "telegram", "notify", "webhook")):
+        return "high"
+    if call.startswith(("requests.post", "requests.get", "httpx.", "urllib.", "socket.")):
+        return "high"
+
+    if category == "file_write":
+        return "medium"
+    if category == "console_output" and call == "input":
+        return "medium"
+    if call.endswith(".mkdir") or "makedirs" in call:
+        return "medium"
+    if any(term in call for term in ("db.", "database", "sqlite", "insert", "update_one", "commit")):
+        return "medium"
+    if any(term in call for term in ("logging.", "logger.", ".log")):
+        return "medium"
+
+    return "low"
+
+
+def _top_risk_items(risk_groups: dict[str, list[SideEffectRecord]]) -> list[SideEffectRecord]:
+    ordered = risk_groups["high"] + risk_groups["medium"] + risk_groups["low"]
+    return ordered[:5]
+
+
+def _format_side_effect(item: SideEffectRecord) -> str:
+    return f"{item.category}/{_side_effect_risk(item)}/{item.call}/{item.file}:{item.line}"
+
+
+def _filtered_low_risk_side_effects(items: list[SideEffectRecord]) -> list[str]:
+    visible = [_format_side_effect(item) for item in items if not _is_low_value_call(item.call)]
+    hidden_count = len(items) - len(visible)
+    if hidden_count:
+        visible.append(f"Grouped {hidden_count} low-value static call(s) in markdown; see static_graph.json for raw data.")
+    return visible
+
+
+def _is_low_value_call(call: str) -> bool:
+    if call in {"len", "str", "int"}:
+        return True
+    return call in {
+        "row.get",
+        "dict.get",
+        "p.add_argument",
+        "parser.add_subparsers",
+        "p.set_defaults",
+    }
 
 
 def _mermaid_id(value: str) -> str:

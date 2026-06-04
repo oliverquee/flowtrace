@@ -86,6 +86,10 @@ Intended flow comparison ignores module-level runtime events such as `main.<modu
 - `flowtrace_output/report.md`
 - `flowtrace_output/flow.mmd`
 
+The markdown report is summary-first and risk-ranked for quick review. It groups side effects into high, medium, and low risk sections and may suppress obvious low-value call noise in markdown.
+
+The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or graph edge.
+
 ## V0.1 Scope
 
 - Reads a Python entry file.
@@ -110,5 +114,6 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - Runtime tracing only records functions inside the selected project root.
 - Runtime mode executes target code and can trigger target side effects.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
+- Markdown reports are curated for readability; JSON outputs remain the source for complete raw data.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual and does not include a visual editor.
