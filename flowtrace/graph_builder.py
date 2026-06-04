@@ -7,6 +7,9 @@ from .runtime_tracer import RuntimeTraceResult
 from .static_analyzer import StaticAnalysisResult
 
 
+PROGRAM_START = "PROGRAM_START"
+
+
 def build_static_graph(static_result: StaticAnalysisResult, diagnostics: DiagnosticsResult) -> dict[str, object]:
     return {
         "project_root": static_result.project_root,
@@ -23,7 +26,9 @@ def build_static_graph(static_result: StaticAnalysisResult, diagnostics: Diagnos
 
 
 def build_runtime_graph(runtime_result: RuntimeTraceResult) -> dict[str, object]:
-    nodes: dict[str, dict[str, str]] = {}
+    nodes: dict[str, dict[str, str]] = {
+        PROGRAM_START: {"id": PROGRAM_START, "file": "", "kind": "synthetic"}
+    }
     edges: dict[tuple[str, str], int] = {}
     call_order: list[str] = []
 
@@ -31,10 +36,10 @@ def build_runtime_graph(runtime_result: RuntimeTraceResult) -> dict[str, object]
         nodes[event.function] = {"id": event.function, "file": event.file}
         if event.event == "function_enter":
             call_order.append(event.function)
-            if event.caller:
-                nodes[event.caller] = {"id": event.caller, "file": ""}
-                edge_key = (event.caller, event.function)
-                edges[edge_key] = edges.get(edge_key, 0) + 1
+            caller = event.caller or PROGRAM_START
+            nodes.setdefault(caller, {"id": caller, "file": ""})
+            edge_key = (caller, event.function)
+            edges[edge_key] = edges.get(edge_key, 0) + 1
 
     return {
         "entry": runtime_result.entry,

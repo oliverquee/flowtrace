@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .diagnostics import DiagnosticsResult
+from .intended_flow import IntendedFlowComparison
 from .runtime_tracer import RuntimeTraceResult
 from .static_analyzer import StaticAnalysisResult
 from .utils import relative_path
@@ -21,6 +22,7 @@ def write_reports(
     diagnostics: DiagnosticsResult,
     static_graph: dict[str, object],
     runtime_graph: dict[str, object],
+    intended_comparison: IntendedFlowComparison,
 ) -> list[Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -41,6 +43,7 @@ def write_reports(
             runtime_result,
             diagnostics,
             flow_path,
+            intended_comparison,
         ),
         encoding="utf-8",
     )
@@ -63,6 +66,7 @@ def _build_markdown_report(
     runtime_result: RuntimeTraceResult,
     diagnostics: DiagnosticsResult,
     flow_path: Path,
+    intended_comparison: IntendedFlowComparison,
 ) -> str:
     executed = [event.function for event in runtime_result.events if event.event == "function_enter"]
     lines = [
@@ -94,7 +98,7 @@ def _build_markdown_report(
         "",
         "## 8. Assigned variables never read",
         *_items(
-            f"{item.name} at {item.file}:{item.line}"
+            f"{item.name} at {item.file}:{item.line} in {_scope_label(item.in_function)}"
             for item in diagnostics.assigned_variables_never_read
         ),
         "",
@@ -105,6 +109,7 @@ def _build_markdown_report(
         ),
         "",
         "## 10. Runtime call order",
+        "- Synthetic root: `PROGRAM_START`",
         *_items(f"{index}. {name}" for index, name in enumerate(executed, start=1)),
         "",
         "## 11. Runtime errors",
@@ -115,6 +120,18 @@ def _build_markdown_report(
         "",
         "## 12. Mermaid diagram location",
         f"- `{flow_path}`",
+        "",
+        "## 13. Intended flow comparison",
+        f"- Name: `{intended_comparison.name or 'None'}`",
+        "- Expected order:",
+        *_items(intended_comparison.expected_runtime_order),
+        "- Actual order:",
+        *_items(intended_comparison.actual_runtime_order),
+        "- Missing expected functions:",
+        *_items(intended_comparison.missing_expected_functions),
+        "- Unexpected actual functions:",
+        *_items(intended_comparison.unexpected_actual_functions),
+        f"- Order mismatch summary: {intended_comparison.order_mismatch_summary}",
         "",
     ]
     return "\n".join(lines)
@@ -154,3 +171,7 @@ def _items(values: Any) -> list[str]:
 
 def _mermaid_id(value: str) -> str:
     return "n_" + "".join(character if character.isalnum() else "_" for character in value)
+
+
+def _scope_label(in_function: str | None) -> str:
+    return in_function or "<module>"

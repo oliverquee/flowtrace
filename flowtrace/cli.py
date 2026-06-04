@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .diagnostics import build_diagnostics
 from .graph_builder import build_runtime_graph, build_static_graph
+from .intended_flow import compare_intended_flow
 from .report_writer import write_reports
 from .runtime_tracer import run_with_trace
 from .static_analyzer import analyze_project
@@ -25,6 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
         default="flowtrace_output",
         help="Directory for generated FlowTrace reports.",
     )
+    parser.add_argument(
+        "--intended-flow",
+        help="Optional JSON file describing expected runtime function order.",
+    )
     parser.add_argument("--output-dir", dest="output", help=argparse.SUPPRESS)
     return parser
 
@@ -40,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
 
         static_result = analyze_project(project_root, entry_path)
         runtime_result = run_with_trace(entry_path, project_root)
+        intended_comparison = compare_intended_flow(args.intended_flow, runtime_result)
         diagnostics = build_diagnostics(static_result, runtime_result)
         static_graph = build_static_graph(static_result, diagnostics)
         runtime_graph = build_runtime_graph(runtime_result)
@@ -52,6 +58,7 @@ def main(argv: list[str] | None = None) -> int:
             diagnostics=diagnostics,
             static_graph=static_graph,
             runtime_graph=runtime_graph,
+            intended_comparison=intended_comparison,
         )
     except FlowTraceError as exc:
         parser.exit(status=1, message=f"flowtrace: {exc}\n")

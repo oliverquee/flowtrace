@@ -41,6 +41,7 @@ def build_diagnostics(
         if event.event == "function_enter" and event.caller is not None
     }
     read_names_by_file = _read_names_by_file(static_result)
+    read_names_by_scope = _read_names_by_scope(static_result)
 
     return DiagnosticsResult(
         functions_defined_but_not_executed=[
@@ -54,7 +55,7 @@ def build_diagnostics(
         assigned_variables_never_read=[
             item
             for item in static_result.assignments
-            if item.name not in read_names_by_file.get(item.file, set())
+            if item.name not in read_names_by_scope.get(_scope_key(item.file, item.in_function), set())
         ],
         side_effect_calls=static_result.side_effects,
         functions_with_no_runtime_callers=sorted(executed_functions - incoming_runtime_callers),
@@ -76,3 +77,14 @@ def _read_names_by_file(static_result: StaticAnalysisResult) -> dict[str, set[st
     for item in static_result.variable_reads:
         reads.setdefault(item.file, set()).add(item.name)
     return reads
+
+
+def _read_names_by_scope(static_result: StaticAnalysisResult) -> dict[tuple[str, str | None], set[str]]:
+    reads: dict[tuple[str, str | None], set[str]] = {}
+    for item in static_result.variable_reads:
+        reads.setdefault(_scope_key(item.file, item.in_function), set()).add(item.name)
+    return reads
+
+
+def _scope_key(file: str, in_function: str | None) -> tuple[str, str | None]:
+    return (file, in_function)

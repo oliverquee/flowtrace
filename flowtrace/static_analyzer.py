@@ -72,6 +72,7 @@ class CallRecord:
     file: str
     line: int
     in_function: str | None
+    resolved_function_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -159,7 +160,9 @@ def analyze_project(project_root: Path, entry_path: Path | None = None) -> Stati
     target_is_flowtrace = bool(entry_path and is_relative_to(entry_path, flowtrace_source_root()))
     for path in iter_python_files(project_root, exclude_flowtrace_source=not target_is_flowtrace):
         files.append(_analyze_file(path, project_root))
-    return StaticAnalysisResult(project_root=str(project_root), files=files)
+    result = StaticAnalysisResult(project_root=str(project_root), files=files)
+    _resolve_local_calls(result)
+    return result
 
 
 def _analyze_file(path: Path, project_root: Path) -> FileStaticAnalysis:
@@ -371,3 +374,78 @@ def _side_effect_category(call_name: str) -> str:
     if call_name.endswith((".append", ".update", ".clear", ".extend")):
         return "state_mutation"
     return "other_side_effect"
+
+
+def _resolve_local_calls(result: StaticAnalysisResult) -> None:
+    functions_by_file_name = {
+        (function.file, function.name): function.id for function in result.functions
+    }
+    functions_by_module_name = {
+        (file.module, function.name): function.id
+        for file in result.files
+        for function in file.functions
+        if function.qualname == function.name
+    }
+    modules = {file.module for file in result.files}
+    import_maps = {
+        file.path: _local_import_map(file, modules, functions_by_module_name)
+        for file in result.files
+    }
+
+    for file in result.files:
+        resolved_calls: list[CallRecord] = []
+        for call in file.calls:
+            resolved_calls.append(
+                CallRecord(
+                    name=call.name,
+                    file=call.file,
+                    line=call.line,
+                    in_function=call.in_function,
+                    resolved_function_id=_resolve_call_id(
+                        call.name,
+                        file.path,
+                        functions_by_file_name,
+                        functions_by_module_name,
+                        import_maps[file.path],
+                    ),
+                )
+            )
+        file.calls = resolved_calls
+
+
+def _local_import_map(
+    file: FileStaticAnalysis,
+    modules: set[str],
+    functions_by_module_name: dict[tuple[str, str], str],
+) -> dict[str, str]:
+    imports: dict[str, str] = {}
+    for item in file.imports:
+        if item.module in modules and (item.module, item.name) in functions_by_module_name:
+            imports[item.used_name] = functions_by_module_name[(item.module, item.name)]
+        elif item.module in modules:
+            imports[item.used_name] = item.module
+    return imports
+
+
+def _resolve_call_id(
+    call_name: str,
+    file_path: str,
+    functions_by_file_name: dict[tuple[str, str], str],
+    functions_by_module_name: dict[tuple[str, str], str],
+    import_map: dict[str, str],
+) -> str | None:
+    if "." not in call_name:
+        if (file_path, call_name) in functions_by_file_name:
+            return functions_by_file_name[(file_path, call_name)]
+        mapped = import_map.get(call_name)
+        if mapped and "." in mapped:
+            return mapped
+        return None
+
+    module_alias, function_name = call_name.rsplit(".", 1)
+    mapped_module = import_map.get(module_alias)
+    if mapped_module and (mapped_module, function_name) in functions_by_module_name:
+        return functions_by_module_name[(mapped_module, function_name)]
+    if (module_alias, function_name) in functions_by_module_name:
+        return functions_by_module_name[(module_alias, function_name)]
+    return None
