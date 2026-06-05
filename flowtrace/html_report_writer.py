@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+import json
 from pathlib import Path
 from typing import Iterable
 
@@ -23,6 +24,7 @@ def write_html_report(
     diagnostics: DiagnosticsResult,
     flow_path: Path,
     node_details_path: Path,
+    node_details: list[dict[str, object]],
     runtime_graph: dict[str, object],
     intended_comparison: IntendedFlowComparison,
     static_runtime_comparison: StaticRuntimeComparison,
@@ -36,6 +38,7 @@ def write_html_report(
         diagnostics,
         flow_path,
         node_details_path,
+        node_details,
         runtime_graph,
         intended_comparison,
         static_runtime_comparison,
@@ -52,6 +55,7 @@ def _document(
     diagnostics: DiagnosticsResult,
     flow_path: Path,
     node_details_path: Path,
+    node_details: list[dict[str, object]],
     runtime_graph: dict[str, object],
     intended_comparison: IntendedFlowComparison,
     comparison: StaticRuntimeComparison,
@@ -88,8 +92,10 @@ def _document(
             _section("intended-flow-comparison", "Intended flow comparison", _intended_flow_html(intended_comparison), open_=False),
             _section("legacy-unexecuted-function-diagnostics", "Legacy unexecuted function diagnostics", _legacy_unexecuted(runtime_result, diagnostics), open_=False),
             _section("assigned-variables-never-read", "Assigned variables never read", _assignments_html(diagnostics), open_=False),
-            _section("node-details-data", "Node details data", f"<p><code>{_e(str(node_details_path))}</code></p>", open_=False),
+            _section("node-details-data-section", "Node details data", f"<p><code>{_e(str(node_details_path))}</code></p>", open_=False),
             _section("technical-inventory", "Technical inventory", _technical_inventory_html(entry_path, project_root, static_result, flow_path, executed), open_=False),
+            _embedded_node_details_json(node_details),
+            _node_inspector_script(),
             "</main>",
             "</body>",
             "</html>",
@@ -148,7 +154,7 @@ def _table_of_contents() -> str:
         ("runtime-call-order", "Runtime call order"),
         ("intended-flow-comparison", "Intended flow comparison"),
         ("assigned-variables-never-read", "Assigned variables never read"),
-        ("node-details-data", "Node details data"),
+        ("node-details-data-section", "Node details data"),
         ("technical-inventory", "Technical inventory"),
     ]
     items = "".join(f"<li><a href='#{_e(anchor)}'>{_e(label)}</a></li>" for anchor, label in links)
@@ -271,7 +277,7 @@ def _comparison_list(items: list[str], comparison: StaticRuntimeComparison) -> s
 
 def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: dict[str, object]) -> str:
     if runtime_result.runtime_skipped:
-        return "<p>Runtime was skipped, so no runtime flowchart is available.</p>"
+        return "<p>Runtime was skipped, so no runtime flowchart is available.</p>" + _node_inspector_html()
 
     nodes = [_node_id(node) for node in runtime_graph.get("nodes", [])]
     edges = [
@@ -280,7 +286,7 @@ def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: d
         if isinstance(edge, dict) and edge.get("caller") and edge.get("callee")
     ]
     if not nodes and not edges:
-        return "<p>No runtime flowchart data was captured.</p>"
+        return "<p>No runtime flowchart data was captured.</p>" + _node_inspector_html()
 
     unique_edges = {(caller, callee) for caller, callee, _count in edges}
     outgoing_counts: dict[str, int] = {}
@@ -303,6 +309,7 @@ def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: d
     if runtime_result.runtime_attempted and not runtime_result.completed:
         parts.append("<p class='hint'>Runtime did not complete; this flowchart is based on partial trace data.</p>")
     parts.append(_runtime_flowchart_svg(nodes, edges))
+    parts.append(_node_inspector_html())
     return "".join(parts)
 
 
@@ -359,7 +366,10 @@ def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str, int]]) 
 
     for node in ordered_nodes:
         y = node_y[node]
-        svg_parts.append("<g>")
+        svg_parts.append(
+            f"<g class='flow-node' data-node-id='{_e(node)}' tabindex='0' role='button' "
+            f"aria-label='Inspect {_e(node)}'>"
+        )
         svg_parts.append(f"<title>{_e(node)}</title>")
         svg_parts.append(f"<rect x='{left}' y='{y}' width='{box_width}' height='{box_height}' rx='6' fill='#f8fafc' stroke='#94a3b8'/>")
         for line_index, line in enumerate(_label_lines(node)):
@@ -372,6 +382,172 @@ def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str, int]]) 
 
     svg_parts.extend(["</svg>", "</div>"])
     return "".join(svg_parts)
+
+
+def _node_inspector_html() -> str:
+    return "".join(
+        [
+            "<p class='hint'>Node details panel requires local browser JavaScript. The report remains readable without it.</p>",
+            "<div class='node-legend' aria-label='Node legend'>",
+            "<span><i class='legend-swatch executed'></i>Executed</span>",
+            "<span><i class='legend-swatch not-executed'></i>Not executed</span>",
+            "<span><i class='legend-swatch risk-high'></i>High risk</span>",
+            "<span><i class='legend-swatch intended-matched'></i>Intended matched</span>",
+            "<span><i class='legend-swatch intended-missing'></i>Intended missing</span>",
+            "<span><i class='legend-swatch intended-unexpected'></i>Intended unexpected</span>",
+            "</div>",
+            "<aside id='node-details-panel' class='node-panel' aria-live='polite'>",
+            "<p>Select a graph node to inspect details.</p>",
+            "</aside>",
+        ]
+    )
+
+
+def _embedded_node_details_json(node_details: list[dict[str, object]]) -> str:
+    payload = json.dumps(node_details, sort_keys=True)
+    payload = payload.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    return f'<script type="application/json" id="node-details-data">{payload}</script>'
+
+
+def _node_inspector_script() -> str:
+    return r"""
+<script>
+(function () {
+  "use strict";
+
+  var dataEl = document.getElementById("node-details-data");
+  var panel = document.getElementById("node-details-panel");
+  if (!dataEl || !panel) {
+    return;
+  }
+
+  var details = [];
+  try {
+    details = JSON.parse(dataEl.textContent || "[]");
+  } catch (error) {
+    panel.textContent = "Node details could not be loaded.";
+    return;
+  }
+
+  var byId = new Map();
+  details.forEach(function (item) {
+    if (item && item.id) {
+      byId.set(String(item.id), item);
+    }
+  });
+
+  function appendText(parent, tagName, text, className) {
+    var el = document.createElement(tagName);
+    if (className) {
+      el.className = className;
+    }
+    el.textContent = text == null || text === "" ? "None" : String(text);
+    parent.appendChild(el);
+    return el;
+  }
+
+  function appendKeyValue(parent, label, value) {
+    var row = document.createElement("div");
+    row.className = "node-kv-row";
+    appendText(row, "dt", label);
+    appendText(row, "dd", value);
+    parent.appendChild(row);
+  }
+
+  function appendJsonBlock(parent, label, value) {
+    appendText(parent, "h4", label);
+    if (!value || (Array.isArray(value) && value.length === 0)) {
+      appendText(parent, "p", "None");
+      return;
+    }
+    var pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(value, null, 2);
+    parent.appendChild(pre);
+  }
+
+  function roleClass(value) {
+    return "role-" + String(value || "none").replace(/[^a-z0-9_-]/gi, "-").toLowerCase();
+  }
+
+  function riskClass(value) {
+    return "risk-" + String(value || "none").replace(/[^a-z0-9_-]/gi, "-").toLowerCase();
+  }
+
+  function decorateNode(nodeEl, detail) {
+    if (!detail) {
+      nodeEl.classList.add("node-detail-missing");
+      return;
+    }
+    nodeEl.classList.add(detail.executed ? "node-executed" : "node-not-executed");
+    nodeEl.classList.add(riskClass(detail.highest_risk_level));
+    nodeEl.classList.add(roleClass(detail.intended_flow_role));
+  }
+
+  function renderDetail(id) {
+    var detail = byId.get(id);
+    panel.textContent = "";
+    if (!detail) {
+      appendText(panel, "h3", id);
+      appendText(panel, "p", "No node details were found for this graph node.");
+      return;
+    }
+
+    appendText(panel, "h3", detail.label || detail.id);
+    var badges = document.createElement("div");
+    badges.className = "node-panel-badges";
+    appendText(badges, "span", "Risk: " + (detail.highest_risk_level || "none"), riskClass(detail.highest_risk_level));
+    appendText(badges, "span", "Executed: " + Boolean(detail.executed), detail.executed ? "executed" : "not-executed");
+    appendText(badges, "span", "Intended: " + (detail.intended_flow_role || "none"), roleClass(detail.intended_flow_role));
+    panel.appendChild(badges);
+
+    var meta = document.createElement("dl");
+    meta.className = "node-kv";
+    appendKeyValue(meta, "id", detail.id);
+    appendKeyValue(meta, "node_type", detail.node_type);
+    appendKeyValue(meta, "file", detail.file);
+    appendKeyValue(meta, "line", detail.line);
+    appendKeyValue(meta, "args", (detail.args || []).join(", "));
+    appendKeyValue(meta, "runtime_first_seen_index", detail.runtime_first_seen_index);
+    appendKeyValue(meta, "runtime_call_count", detail.runtime_call_count);
+    panel.appendChild(meta);
+
+    appendJsonBlock(panel, "Incoming static calls", detail.incoming_static_calls);
+    appendJsonBlock(panel, "Outgoing static calls", detail.outgoing_static_calls);
+    appendJsonBlock(panel, "Incoming runtime calls", detail.incoming_runtime_calls);
+    appendJsonBlock(panel, "Outgoing runtime calls", detail.outgoing_runtime_calls);
+    appendJsonBlock(panel, "Side effects", detail.side_effects);
+    appendJsonBlock(panel, "Diagnostics", detail.diagnostics);
+  }
+
+  function selectNode(nodeEl) {
+    document.querySelectorAll(".flow-node.selected").forEach(function (item) {
+      item.classList.remove("selected");
+    });
+    nodeEl.classList.add("selected");
+    renderDetail(nodeEl.getAttribute("data-node-id"));
+  }
+
+  var nodes = Array.prototype.slice.call(document.querySelectorAll(".flow-node[data-node-id]"));
+  nodes.forEach(function (nodeEl) {
+    decorateNode(nodeEl, byId.get(nodeEl.getAttribute("data-node-id")));
+    nodeEl.addEventListener("click", function () {
+      selectNode(nodeEl);
+    });
+    nodeEl.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectNode(nodeEl);
+      }
+    });
+  });
+
+  var startNode = document.querySelector(".flow-node[data-node-id='PROGRAM_START']");
+  if (startNode) {
+    selectNode(startNode);
+  }
+})();
+</script>
+""".strip()
 
 
 def _node_id(node: object) -> str:
@@ -659,6 +835,31 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .flow-meta{color:#475569;font-size:13px}
 .flowchart-wrap{overflow-x:auto;border:1px solid #e1e6ef;border-radius:8px;background:#fff;margin-top:10px}
 .runtime-flowchart{display:block;min-width:530px;max-width:100%;height:auto}
+.flow-node{cursor:pointer;outline:none}
+.flow-node rect{transition:fill .12s ease,stroke .12s ease,stroke-width .12s ease}
+.flow-node:hover rect,.flow-node:focus rect{fill:#eff6ff;stroke:#2563eb;stroke-width:2.4}
+.flow-node.selected rect{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}
+.flow-node.node-not-executed rect{stroke-dasharray:5 3}
+.flow-node.risk-high rect{stroke:#dc2626}.flow-node.risk-medium rect{stroke:#d97706}.flow-node.risk-low rect{stroke:#16a34a}
+.flow-node.role-matched text{font-weight:700}.flow-node.role-missing rect{fill:#fff7ed}.flow-node.role-unexpected rect{fill:#fef2f2}
+.node-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:12px 0;color:#475569;font-size:13px}
+.node-legend span{display:inline-flex;align-items:center;gap:6px}
+.legend-swatch{display:inline-block;width:14px;height:14px;border-radius:3px;border:2px solid #94a3b8;background:#f8fafc}
+.legend-swatch.executed{background:#dbeafe;border-color:#1d4ed8}.legend-swatch.not-executed{border-style:dashed}
+.legend-swatch.risk-high{border-color:#dc2626}.legend-swatch.intended-matched{background:#dcfce7;border-color:#16a34a}
+.legend-swatch.intended-missing{background:#fff7ed;border-color:#d97706}.legend-swatch.intended-unexpected{background:#fef2f2;border-color:#dc2626}
+.node-panel{border:1px solid #d8dee9;border-radius:8px;background:#fbfcff;padding:14px;margin-top:12px}
+.node-panel h3{margin:0 0 8px;overflow-wrap:anywhere}.node-panel h4{margin:14px 0 6px}
+.node-panel-badges{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 12px}
+.node-panel-badges span{border-radius:999px;padding:3px 9px;font-weight:700;font-size:12px;border:1px solid #d8dee9}
+.node-panel-badges .risk-high{background:#fee2e2;color:#991b1b}.node-panel-badges .risk-medium{background:#fef3c7;color:#92400e}
+.node-panel-badges .risk-low{background:#dcfce7;color:#166534}.node-panel-badges .risk-none{background:#eef2f7;color:#475569}
+.node-panel-badges .executed,.node-panel-badges .role-matched{background:#dcfce7;color:#166534}
+.node-panel-badges .not-executed,.node-panel-badges .role-none{background:#eef2f7;color:#475569}
+.node-panel-badges .role-missing{background:#fff7ed;color:#9a3412}.node-panel-badges .role-unexpected{background:#fee2e2;color:#991b1b}
+.node-kv{display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:4px 10px;margin:8px 0}
+.node-kv-row{display:contents}.node-kv dt{font-weight:700;color:#667085}.node-kv dd{margin:0;overflow-wrap:anywhere}
+.node-panel pre{background:#eef2f7;border-radius:6px;padding:9px;overflow:auto;max-height:260px;white-space:pre-wrap}
 li{margin:3px 0;overflow-wrap:anywhere}
 @media print{
 body{background:#fff;color:#111827;font-size:12px}
@@ -672,5 +873,6 @@ a{color:#111827;text-decoration:none}
 .toc ul{columns:2}
 .flowchart-wrap{overflow:visible}
 .runtime-flowchart{min-width:0;width:100%}
+.node-panel{break-inside:avoid;page-break-inside:avoid}
 }
 """.strip()

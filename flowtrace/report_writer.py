@@ -71,6 +71,7 @@ def write_reports(
         diagnostics=diagnostics,
         flow_path=flow_path,
         node_details_path=node_details_path,
+        node_details=node_details,
         runtime_graph=runtime_graph,
         intended_comparison=intended_comparison,
         static_runtime_comparison=static_runtime_comparison,

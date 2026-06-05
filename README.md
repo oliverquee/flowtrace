@@ -126,7 +126,7 @@ If runtime starts but fails, FlowTrace keeps a partial comparison based on the r
 
 The markdown report is organized for review: summary, recommended checks, project status, top risks, static-vs-runtime comparison, risk sections, then technical inventory. It may suppress obvious low-value call noise in markdown.
 
-The HTML report is a static local file with inline CSS, native collapsible sections, and no external resources, JavaScript, CDN, server, or network calls.
+The HTML report is a static local file with inline CSS, inline JavaScript for local node inspection, native collapsible sections, and no external resources, CDN, server, or network calls.
 
 `report.html` includes a table of contents with anchor links, quick status badges, and a grouped technical inventory lower in the page for files, imports, functions, executed functions, and Mermaid location. The layout includes print/PDF-friendly CSS for local export.
 
@@ -134,7 +134,9 @@ The HTML report is a static local file with inline CSS, native collapsible secti
 
 The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trace.jsonl`, and `runtime_graph.json` when you need every captured call, side effect, runtime event, or full raw graph edge.
 
-`node_details.json` enriches each meaningful node/function with source location, args, execution state, runtime call counts, incoming/outgoing static and runtime calls, side effects, risk level, diagnostics, and intended-flow role. It is the data foundation for future clickable graph review. `report.html` only links to this data for now; it remains static and is not yet interactive.
+`node_details.json` enriches each meaningful node/function with source location, args, execution state, runtime call counts, incoming/outgoing static and runtime calls, side effects, risk level, diagnostics, and intended-flow role. It remains the raw data foundation for graph review.
+
+`report.html` embeds that node detail data for local interactive node inspection. Runtime flowchart nodes can be selected to show a read-only side panel with metadata, risks, calls, side effects, diagnostics, and intended-flow role. This uses inline DOM-only JavaScript, does not fetch `node_details.json`, makes no network calls, and is not a visual editor.
 
 ## V0.1 Scope
 
@@ -164,11 +166,12 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - CLI-style projects should usually be run with `--target-args` so runtime tracing reaches the intended command path.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Markdown reports are curated for readability and ordered from summary to risks to comparison to technical inventory; JSON outputs remain the source for complete raw data.
-- HTML reports are static local files with inline CSS and no external resources.
+- HTML reports are static local files with inline CSS, inline DOM-only JavaScript for node inspection, and no external resources or network calls.
 - HTML reports include anchor navigation and a grouped technical inventory lower in the page.
 - HTML report styling includes print/PDF-friendly rules for local export.
 - HTML flowcharts are simplified best-effort SVG diagrams, not a visual editor.
-- `node_details.json` prepares data for future clickable graph review, but FlowTrace does not include the interactive viewer yet.
+- `report.html` supports local read-only node inspection, but FlowTrace does not include a graph editor or visual flow editor.
+- `node_details.json` remains the raw node-detail data source for future graph review features.
 - Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.
 - Intended flow comparison is textual, best effort, validates JSON inputs, and does not include a visual editor.

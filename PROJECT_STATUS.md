@@ -24,6 +24,10 @@ python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello 
 
 Gmail automation project static-only scan works.
 
+## In Progress
+
+- V0.5: Local interactive HTML node inspection is in progress on a feature branch. This is not yet claimed as stable.
+
 ## Known Limitations
 
 - Python only
