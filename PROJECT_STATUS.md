@@ -3,8 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.4
-- Latest stable commit: bf62e11
+- Current stable version: V0.5
+- Latest stable commit: 8f8d121
 
 ## Current Tested Commands
 
