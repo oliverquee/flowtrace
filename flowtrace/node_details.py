@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from .diagnostics import DiagnosticsResult
 from .graph_builder import PROGRAM_START, RUNTIME_SKIPPED
 from .intended_flow import IntendedFlowComparison
@@ -20,6 +22,7 @@ def build_node_details(
     modules_by_id = _module_nodes(static_result)
     runtime_nodes = _runtime_node_ids(runtime_graph)
     all_ids = sorted(set(functions_by_id) | set(modules_by_id) | runtime_nodes | {PROGRAM_START})
+    snippet_context = _snippet_context(static_result, runtime_result)
 
     runtime_order, runtime_counts = _runtime_order(runtime_result)
     static_incoming, static_outgoing = _static_call_maps(static_result)
@@ -42,6 +45,7 @@ def build_node_details(
             side_effects=side_effects_by_scope.get(node_id, []),
             diagnostics=_diagnostics_for_node(node_id, diagnostics),
             intended_flow_role=intended_roles.get(node_id, "none"),
+            snippet_context=snippet_context,
         )
         for node_id in all_ids
         if node_id
@@ -62,14 +66,18 @@ def _node_record(
     side_effects: list[SideEffectRecord],
     diagnostics: dict[str, object],
     intended_flow_role: str,
+    snippet_context: dict[str, object],
 ) -> dict[str, object]:
     side_effect_dicts = [item.__dict__ for item in side_effects]
+    node_type = _node_type(node_id, function, module, runtime_graph)
+    file_path = function.file if function else (str(module.get("file", "")) if module else _runtime_file(node_id, runtime_graph))
+    line = function.line if function else (module.get("line") if module else None)
     return {
         "id": node_id,
         "label": _label(node_id),
-        "node_type": _node_type(node_id, function, module, runtime_graph),
-        "file": function.file if function else (str(module.get("file", "")) if module else _runtime_file(node_id, runtime_graph)),
-        "line": function.line if function else (module.get("line") if module else None),
+        "node_type": node_type,
+        "file": file_path,
+        "line": line,
         "args": function.args if function else [],
         "executed": runtime_counts.get(node_id, 0) > 0,
         "runtime_first_seen_index": runtime_order.get(node_id),
@@ -82,6 +90,12 @@ def _node_record(
         "highest_risk_level": _highest_risk_level(side_effects),
         "diagnostics": diagnostics,
         "intended_flow_role": intended_flow_role,
+        "source_snippet": _source_snippet(
+            file_path=file_path,
+            line=line,
+            node_type=node_type,
+            snippet_context=snippet_context,
+        ),
     }
 
 
@@ -99,6 +113,122 @@ def _runtime_node_ids(runtime_graph: dict[str, object]) -> set[str]:
         if isinstance(item, dict) and item.get("id"):
             nodes.add(str(item["id"]))
     return nodes
+
+
+def _snippet_context(
+    static_result: StaticAnalysisResult,
+    runtime_result: RuntimeTraceResult,
+) -> dict[str, object]:
+    project_root = Path(runtime_result.project_root).resolve() if runtime_result.project_root else None
+    allowed_files: dict[str, Path] = {}
+    for file in static_result.files:
+        relative = str(file.path)
+        path = (project_root / relative).resolve() if project_root else Path(relative).resolve()
+        allowed_files[relative] = path
+    return {"project_root": project_root, "allowed_files": allowed_files}
+
+
+def _source_snippet(
+    file_path: str,
+    line: object,
+    node_type: str,
+    snippet_context: dict[str, object],
+) -> dict[str, object]:
+    unavailable = {
+        "available": False,
+        "file": file_path or "",
+        "start_line": None,
+        "end_line": None,
+        "focus_line": None,
+        "lines": [],
+    }
+    if node_type in {"program_start", "runtime_skipped", "unknown_runtime"}:
+        return {**unavailable, "reason": "No project source file is associated with this node."}
+    if not file_path:
+        return {**unavailable, "reason": "No source file is associated with this node."}
+    if _is_blocked_source_path(file_path):
+        return {**unavailable, "reason": "File type is intentionally excluded from source snippets."}
+
+    allowed_files = snippet_context.get("allowed_files", {})
+    if not isinstance(allowed_files, dict) or file_path not in allowed_files:
+        return {**unavailable, "reason": "File was not part of static analysis; snippet not read."}
+
+    absolute_path = allowed_files[file_path]
+    if not isinstance(absolute_path, Path):
+        return {**unavailable, "reason": "Source path could not be resolved safely."}
+    project_root = snippet_context.get("project_root")
+    if isinstance(project_root, Path) and not _is_relative_to(absolute_path, project_root):
+        return {**unavailable, "reason": "Resolved source path is outside the project root."}
+    if not absolute_path.is_file():
+        return {**unavailable, "reason": "Source file could not be found."}
+
+    try:
+        source_lines = absolute_path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError:
+        try:
+            source_lines = absolute_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as exc:
+            return {**unavailable, "reason": f"Source file could not be read: {exc}"}
+    except OSError as exc:
+        return {**unavailable, "reason": f"Source file could not be read: {exc}"}
+
+    if not source_lines:
+        return {**unavailable, "reason": "Source file is empty."}
+
+    if node_type == "module":
+        focus_line = 1
+        start_line = 1
+        end_line = min(len(source_lines), 25)
+    else:
+        focus_line = _safe_line_number(line)
+        if focus_line is None:
+            return {**unavailable, "reason": "Node source line is unavailable."}
+        focus_line = max(1, min(focus_line, len(source_lines)))
+        start_line = max(1, focus_line - 8)
+        end_line = min(len(source_lines), focus_line + 16)
+
+    return {
+        "available": True,
+        "file": file_path,
+        "start_line": start_line,
+        "end_line": end_line,
+        "focus_line": focus_line,
+        "lines": [
+            {
+                "line_number": line_number,
+                "text": source_lines[line_number - 1],
+                "is_focus_line": line_number == focus_line,
+            }
+            for line_number in range(start_line, end_line + 1)
+        ],
+    }
+
+
+def _safe_line_number(line: object) -> int | None:
+    try:
+        value = int(line)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _is_blocked_source_path(file_path: str) -> bool:
+    path = Path(file_path)
+    name = path.name.lower()
+    suffix = path.suffix.lower()
+    blocked_names = {".env", "credentials", "credentials.json", "token.json", "secrets.json"}
+    blocked_suffixes = {".env", ".key", ".pem", ".sqlite", ".sqlite3", ".db"}
+    if name in blocked_names or suffix in blocked_suffixes:
+        return True
+    return any(part.lower() in {".venv", "venv", "env", "__pycache__"} for part in path.parts)
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+        return True
+    except ValueError:
+        return False
 
 
 def _runtime_order(runtime_result: RuntimeTraceResult) -> tuple[dict[str, int], dict[str, int]]:

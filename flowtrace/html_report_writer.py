@@ -579,6 +579,35 @@ def _node_inspector_script() -> str:
     parent.appendChild(pre);
   }
 
+  function appendSourceSnippet(parent, snippet) {
+    appendText(parent, "h4", "Source snippet");
+    if (!snippet || !snippet.available) {
+      appendText(parent, "p", snippet && snippet.reason ? snippet.reason : "Source snippet is unavailable.");
+      return;
+    }
+    appendText(parent, "p", String(snippet.file || "Unknown file") + " lines " + snippet.start_line + "-" + snippet.end_line, "source-snippet-meta");
+    var table = document.createElement("table");
+    table.className = "source-snippet";
+    var tbody = document.createElement("tbody");
+    (snippet.lines || []).forEach(function (line) {
+      var row = document.createElement("tr");
+      if (line.is_focus_line) {
+        row.className = "focus-line";
+      }
+      var numberCell = document.createElement("td");
+      numberCell.className = "line-number";
+      numberCell.textContent = String(line.line_number);
+      var textCell = document.createElement("td");
+      textCell.className = "line-text";
+      textCell.textContent = line.text || "";
+      row.appendChild(numberCell);
+      row.appendChild(textCell);
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    parent.appendChild(table);
+  }
+
   function roleClass(value) {
     return "role-" + String(value || "none").replace(/[^a-z0-9_-]/gi, "-").toLowerCase();
   }
@@ -634,6 +663,7 @@ def _node_inspector_script() -> str:
     appendKeyValue(meta, "runtime_call_count", detail.runtime_call_count);
     panel.appendChild(meta);
 
+    appendSourceSnippet(panel, detail.source_snippet);
     appendJsonBlock(panel, "Incoming static calls", detail.incoming_static_calls);
     appendJsonBlock(panel, "Outgoing static calls", detail.outgoing_static_calls);
     appendJsonBlock(panel, "Incoming runtime calls", detail.incoming_runtime_calls);
@@ -1315,6 +1345,13 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .node-kv{display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:4px 10px;margin:8px 0}
 .node-kv-row{display:contents}.node-kv dt{font-weight:700;color:#667085}.node-kv dd{margin:0;overflow-wrap:anywhere}
 .node-panel pre{background:#eef2f7;border-radius:6px;padding:9px;overflow:auto;max-height:260px;white-space:pre-wrap}
+.source-snippet-meta{color:#475569;font-size:13px;margin:4px 0 6px}
+.source-snippet{display:block;max-height:360px;overflow:auto;border:1px solid #e1e6ef;border-radius:6px;background:#fff;font-family:Consolas,Menlo,monospace;font-size:12px}
+.source-snippet tbody{display:table;width:100%;border-collapse:collapse}
+.source-snippet td{border-bottom:0;padding:1px 6px;vertical-align:top}
+.source-snippet .line-number{width:52px;text-align:right;color:#64748b;background:#f8fafc;user-select:none}
+.source-snippet .line-text{white-space:pre;overflow-wrap:normal}
+.source-snippet .focus-line .line-number,.source-snippet .focus-line .line-text{background:#fef3c7;color:#111827;font-weight:700}
 li{margin:3px 0;overflow-wrap:anywhere}
 @media print{
 body{background:#fff;color:#111827;font-size:12px}
