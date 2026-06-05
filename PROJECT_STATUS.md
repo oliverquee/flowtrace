@@ -26,6 +26,7 @@ Gmail automation project static-only scan works.
 
 ## In Progress
 
+- V0.6.1: Runtime playback polish is in progress on a feature branch. This is not yet claimed as stable.
 
 
 ## Known Limitations

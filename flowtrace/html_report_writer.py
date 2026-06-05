@@ -400,17 +400,24 @@ def _playback_html(runtime_result: RuntimeTraceResult) -> str:
     disabled_attr = " disabled" if runtime_result.runtime_skipped else ""
     unavailable = ""
     if runtime_result.runtime_skipped:
-        unavailable = "<p class='playback-unavailable'>Runtime playback is unavailable because runtime was skipped.</p>"
+        unavailable = "<p class='playback-unavailable'>Runtime playback unavailable: run without --static-only to capture execution events.</p>"
     partial_note = ""
     if runtime_result.runtime_attempted and not runtime_result.completed:
-        partial_note = "<p class='hint'>Playback is based on partial runtime trace because runtime did not complete.</p>"
+        partial_note = "<p class='hint'>Partial playback: runtime ended with an error.</p>"
     return "".join(
         [
             "<section class='playback-panel' aria-label='Runtime playback'>",
             "<h3>Runtime playback</h3>",
             "<p class='hint'>Runtime playback requires local browser JavaScript.</p>",
+            "<p class='hint'>Use Next to step through execution. Click any event row to jump to that step. Click graph nodes to inspect details.</p>",
             unavailable,
             partial_note,
+            "<fieldset class='playback-filters'>",
+            "<legend>Event filter</legend>",
+            f"<label><input type='radio' name='playback-filter' value='all'{disabled_attr}> All events</label>",
+            f"<label><input type='radio' name='playback-filter' value='enter'{disabled_attr}> Function enter only</label>",
+            f"<label><input type='radio' name='playback-filter' value='errors'{disabled_attr}> Errors only</label>",
+            "</fieldset>",
             "<div class='playback-controls'>",
             f"<button type='button' id='playback-first'{disabled_attr}>First</button>",
             f"<button type='button' id='playback-prev'{disabled_attr}>Previous</button>",
@@ -508,21 +515,27 @@ def _node_inspector_script() -> str:
   var nextButton = document.getElementById("playback-next");
   var toggleButton = document.getElementById("playback-toggle");
   var speedSelect = document.getElementById("playback-speed");
-  if (!nodeDataEl || !panel) {
+  var filterInputs = Array.prototype.slice.call(document.querySelectorAll("input[name='playback-filter']"));
+  if (!panel) {
     return;
   }
 
   var details = [];
   var runtimeEvents = [];
+  var filteredEvents = [];
+  var nodeDetailsLoaded = true;
+  var runtimeEventsLoaded = true;
   try {
-    details = JSON.parse(nodeDataEl.textContent || "[]");
+    details = nodeDataEl ? JSON.parse(nodeDataEl.textContent || "[]") : [];
   } catch (error) {
+    nodeDetailsLoaded = false;
+    details = [];
     panel.textContent = "Node details could not be loaded.";
-    return;
   }
   try {
     runtimeEvents = eventDataEl ? JSON.parse(eventDataEl.textContent || "[]") : [];
   } catch (error) {
+    runtimeEventsLoaded = false;
     runtimeEvents = [];
   }
 
@@ -591,6 +604,11 @@ def _node_inspector_script() -> str:
   function renderNodeDetail(id) {
     var detail = byId.get(id);
     panel.textContent = "";
+    if (!nodeDetailsLoaded) {
+      appendText(panel, "h3", id);
+      appendText(panel, "p", "Node details could not be loaded.", "playback-error-text");
+      return;
+    }
     if (!detail) {
       appendText(panel, "h3", id);
       appendText(panel, "p", "No node details were found for this graph node.");
@@ -649,7 +667,7 @@ def _node_inspector_script() -> str:
     document.querySelectorAll(".flow-node.playback-visited,.flow-node.playback-error").forEach(function (item) {
       item.classList.remove("playback-visited", "playback-error");
     });
-    runtimeEvents.slice(0, index + 1).forEach(function (event) {
+    filteredEvents.slice(0, index + 1).forEach(function (event) {
       if (!event || !event.function) {
         return;
       }
@@ -667,6 +685,48 @@ def _node_inspector_script() -> str:
     return event && (event.event === "function_error" || event.event === "runtime_error" || event.error_type || event.error_message);
   }
 
+  function isEnterEvent(event) {
+    return event && event.event === "function_enter";
+  }
+
+  function selectedFilter() {
+    var selected = filterInputs.find(function (input) {
+      return input.checked;
+    });
+    return selected ? selected.value : "all";
+  }
+
+  function chooseDefaultFilter() {
+    if (!filterInputs.length) {
+      return;
+    }
+    var defaultValue = runtimeEvents.length > 20 ? "enter" : "all";
+    var defaultInput = filterInputs.find(function (input) {
+      return input.value === defaultValue;
+    }) || filterInputs[0];
+    defaultInput.checked = true;
+  }
+
+  function eventMatchesFilter(event, filter) {
+    if (filter === "enter") {
+      return isEnterEvent(event);
+    }
+    if (filter === "errors") {
+      return isErrorEvent(event);
+    }
+    return true;
+  }
+
+  function applyFilter() {
+    var filter = selectedFilter();
+    filteredEvents = runtimeEvents.filter(function (event) {
+      return eventMatchesFilter(event, filter);
+    });
+    playbackIndex = filteredEvents.length ? 0 : -1;
+    renderEventList();
+    renderPlaybackStep(playbackIndex);
+  }
+
   function cssEscape(value) {
     if (window.CSS && typeof window.CSS.escape === "function") {
       return window.CSS.escape(String(value));
@@ -680,9 +740,14 @@ def _node_inspector_script() -> str:
     }
     eventDetail.textContent = "";
     appendText(eventDetail, "h4", event ? "Current runtime event" : "No runtime events captured");
+    if (!runtimeEventsLoaded) {
+      appendText(eventDetail, "p", "Runtime playback data could not be loaded.", "playback-error-text");
+      return;
+    }
     var meta = document.createElement("dl");
     meta.className = "node-kv";
-    appendKeyValue(meta, "step", event ? String(index + 1) + " / " + runtimeEvents.length : "0 / 0");
+    appendKeyValue(meta, "step", event ? String(index + 1) + " / " + filteredEvents.length : "0 / 0");
+    appendKeyValue(meta, "raw_index", event && event.index);
     appendKeyValue(meta, "event", event && event.event);
     appendKeyValue(meta, "function", event && event.function);
     appendKeyValue(meta, "file", event && event.file);
@@ -695,7 +760,7 @@ def _node_inspector_script() -> str:
 
   function updateCounter() {
     if (counter) {
-      counter.textContent = runtimeEvents.length ? String(playbackIndex + 1) + " / " + runtimeEvents.length : "0 / 0";
+      counter.textContent = filteredEvents.length ? String(playbackIndex + 1) + " / " + filteredEvents.length : "0 / 0";
     }
   }
 
@@ -713,23 +778,42 @@ def _node_inspector_script() -> str:
   }
 
   function highlightIncomingEdge(event) {
-    if (!event || !event.caller || !event.function) {
+    if (!event || !event.function) {
       return;
     }
-    var id = edgeId(event.caller, event.function);
+    var caller = event.caller || previousEnterFunction(playbackIndex);
+    if (!caller) {
+      return;
+    }
+    var id = edgeId(caller, event.function);
     document.querySelectorAll(".flow-edge[data-edge-id='" + cssEscape(id) + "']").forEach(function (edge) {
       edge.classList.add("playback-current-edge");
     });
   }
 
+  function previousEnterFunction(filteredIndex) {
+    for (var i = filteredIndex - 1; i >= 0; i -= 1) {
+      if (filteredEvents[i] && filteredEvents[i].function && filteredEvents[i].event === "function_enter") {
+        return filteredEvents[i].function;
+      }
+    }
+    return null;
+  }
+
   function renderPlaybackStep(index) {
-    if (!runtimeEvents.length) {
+    if (!runtimeEventsLoaded) {
       updateCounter();
       updateEventDetail(null, -1);
       return;
     }
-    playbackIndex = Math.max(0, Math.min(index, runtimeEvents.length - 1));
-    var event = runtimeEvents[playbackIndex];
+    if (!filteredEvents.length) {
+      updateCounter();
+      updateEventDetail(null, -1);
+      highlightEventRow(-1);
+      return;
+    }
+    playbackIndex = Math.max(0, Math.min(index, filteredEvents.length - 1));
+    var event = filteredEvents[playbackIndex];
     clearPlaybackHighlights();
     markVisitedThrough(playbackIndex);
     updateCounter();
@@ -747,6 +831,9 @@ def _node_inspector_script() -> str:
       if (event.event === "function_enter") {
         highlightIncomingEdge(event);
       }
+      if (isErrorEvent(event)) {
+        highlightIncomingEdge(event);
+      }
     }
   }
 
@@ -761,14 +848,14 @@ def _node_inspector_script() -> str:
   }
 
   function startPlayback() {
-    if (!runtimeEvents.length || playbackTimer) {
+    if (!filteredEvents.length || playbackTimer) {
       return;
     }
     if (toggleButton) {
       toggleButton.textContent = "Pause";
     }
     playbackTimer = window.setInterval(function () {
-      if (playbackIndex >= runtimeEvents.length - 1) {
+      if (playbackIndex >= filteredEvents.length - 1) {
         stopPlayback();
         return;
       }
@@ -781,16 +868,22 @@ def _node_inspector_script() -> str:
       return;
     }
     eventList.textContent = "";
-    if (!runtimeEvents.length) {
-      appendText(eventList, "li", "No runtime events captured.");
+    if (!runtimeEventsLoaded) {
+      appendText(eventList, "li", "Runtime playback data could not be loaded.", "playback-error-text");
       return;
     }
-    runtimeEvents.forEach(function (event, index) {
+    if (!filteredEvents.length) {
+      appendText(eventList, "li", "No runtime events match this filter.");
+      return;
+    }
+    filteredEvents.forEach(function (event, index) {
       var row = document.createElement("li");
       row.className = "runtime-event-row";
       row.setAttribute("data-step-index", String(index));
       row.tabIndex = 0;
-      row.textContent = String(index + 1) + ". " + (event.event || "event") + " | " + (event.function || "None") + " | " + (event.file || "None") + ":" + (event.line == null ? "None" : event.line);
+      var location = event.file ? event.file + (event.line == null ? "" : ":" + event.line) : "None";
+      var marker = isErrorEvent(event) ? " [ERROR]" : "";
+      row.textContent = String(index + 1) + ". " + (event.event || "event") + marker + " | " + (event.function || "None") + " | " + location;
       if (isErrorEvent(event)) {
         row.classList.add("error");
       }
@@ -827,6 +920,19 @@ def _node_inspector_script() -> str:
     });
   });
 
+  chooseDefaultFilter();
+  filterInputs.forEach(function (input) {
+    input.addEventListener("change", function () {
+      stopPlayback();
+      applyFilter();
+    });
+  });
+  filteredEvents = runtimeEvents.slice();
+  if (filterInputs.length) {
+    filteredEvents = runtimeEvents.filter(function (event) {
+      return eventMatchesFilter(event, selectedFilter());
+    });
+  }
   renderEventList();
   if (firstButton) {
     firstButton.addEventListener("click", function () {
@@ -865,15 +971,15 @@ def _node_inspector_script() -> str:
   }
 
   var startNode = document.querySelector(".flow-node[data-node-id='PROGRAM_START']");
-  if (runtimeEvents.length && runtimeEvents[0].event !== "runtime_skipped") {
+  if (filteredEvents.length && filteredEvents[0].event !== "runtime_skipped") {
     renderPlaybackStep(0);
   } else if (startNode) {
     selectNode(startNode, false);
     updateCounter();
-    updateEventDetail(runtimeEvents[0] || null, 0);
+    updateEventDetail(filteredEvents[0] || runtimeEvents[0] || null, 0);
   } else {
     updateCounter();
-    updateEventDetail(runtimeEvents[0] || null, 0);
+    updateEventDetail(filteredEvents[0] || runtimeEvents[0] || null, 0);
   }
 })();
 </script>
@@ -1171,18 +1277,22 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .flow-node.selected rect{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}
 .flow-node.node-not-executed rect{stroke-dasharray:5 3}
 .flow-node.playback-visited rect{fill:#ecfdf5}.flow-node.playback-current rect{fill:#fef3c7;stroke:#d97706;stroke-width:3.2}
+.flow-node.selected.playback-current rect{fill:#fde68a;stroke:#1d4ed8;stroke-width:3.4}
 .flow-node.playback-error rect{fill:#fee2e2;stroke:#dc2626;stroke-width:3.2}
 .flow-edge.playback-current-edge{stroke:#d97706;stroke-width:3.4}
 .flow-node.risk-high rect{stroke:#dc2626}.flow-node.risk-medium rect{stroke:#d97706}.flow-node.risk-low rect{stroke:#16a34a}
 .flow-node.role-matched text{font-weight:700}.flow-node.role-missing rect{fill:#fff7ed}.flow-node.role-unexpected rect{fill:#fef2f2}
 .playback-panel{border:1px solid #d8dee9;border-radius:8px;background:#fbfcff;padding:12px;margin-top:12px}
 .playback-panel h3{margin:0 0 8px}.playback-unavailable{font-weight:700;color:#92400e}
+.playback-filters{border:1px solid #e1e6ef;border-radius:6px;background:#fff;margin:10px 0;padding:8px 10px}
+.playback-filters legend{font-weight:700;color:#475569}.playback-filters label{display:inline-flex;align-items:center;gap:5px;margin:3px 12px 3px 0}
 .playback-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
 .playback-controls button,.playback-controls select{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:5px 9px;font:inherit}
-.playback-controls button{cursor:pointer}.playback-controls button:disabled,.playback-controls select:disabled{opacity:.55;cursor:not-allowed}
+.playback-controls button{cursor:pointer}.playback-controls button:disabled,.playback-controls select:disabled,.playback-filters input:disabled{opacity:.55;cursor:not-allowed}
 .playback-counter{font-weight:700;color:#475569}
 .event-detail{border:1px solid #e1e6ef;border-radius:6px;background:#fff;padding:10px;margin:8px 0}
 .event-detail h4{margin:0 0 8px}
+.playback-error-text{color:#991b1b;font-weight:700}
 .runtime-event-list{max-height:260px;overflow:auto;background:#fff;border:1px solid #e1e6ef;border-radius:6px;padding:8px 8px 8px 30px}
 .runtime-event-row{cursor:pointer;border-radius:5px;padding:3px 5px;overflow-wrap:anywhere}
 .runtime-event-row:hover,.runtime-event-row:focus{background:#eff6ff;outline:none}.runtime-event-row.current{background:#fef3c7;font-weight:700}
