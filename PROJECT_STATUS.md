@@ -3,8 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.6.1
-- Latest stable commit: 9522236
+- Current stable version: V0.7
+- Latest stable commit: 013b808
 
 ## Current Tested Commands
 
@@ -26,7 +26,7 @@ Gmail automation project static-only scan works.
 
 ## In Progress
 
-- V0.7: Source snippets in the local HTML node inspector are in progress on a feature branch. This is not yet claimed as stable.
+
 
 
 
