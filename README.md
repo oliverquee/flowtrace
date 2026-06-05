@@ -138,6 +138,8 @@ The JSON outputs remain raw and complete. Use `static_graph.json`, `runtime_trac
 
 `report.html` embeds that node detail data for local interactive node inspection. Runtime flowchart nodes can be selected to show a read-only side panel with metadata, risks, calls, side effects, diagnostics, and intended-flow role. This uses inline DOM-only JavaScript, does not fetch `node_details.json`, makes no network calls, and is not a visual editor.
 
+`report.html` also includes local runtime playback. FlowTrace embeds a safe structured copy of runtime events in the HTML, then provides First, Previous, Next, Play/Pause, speed, step counter, current-event details, and a compact event list. Playback highlights current and visited nodes, marks error events, and keeps the node side panel in sync. Static-only reports show playback as unavailable because no runtime was executed. Runtime-error reports can still play back the partial trace captured before the error.
+
 ## V0.1 Scope
 
 - Reads a Python entry file.
@@ -166,11 +168,12 @@ FlowTrace V0.1 has no web UI, AI integration, SaaS layer, editor, animation, dat
 - CLI-style projects should usually be run with `--target-args` so runtime tracing reaches the intended command path.
 - Static-only mode skips runtime tracing, so runtime call graphs show a skipped-runtime marker instead of target calls.
 - Markdown reports are curated for readability and ordered from summary to risks to comparison to technical inventory; JSON outputs remain the source for complete raw data.
-- HTML reports are static local files with inline CSS, inline DOM-only JavaScript for node inspection, and no external resources or network calls.
+- HTML reports are static local files with inline CSS, inline DOM-only JavaScript for node inspection and runtime playback, and no external resources or network calls.
 - HTML reports include anchor navigation and a grouped technical inventory lower in the page.
 - HTML report styling includes print/PDF-friendly rules for local export.
 - HTML flowcharts are simplified best-effort SVG diagrams, not a visual editor.
 - `report.html` supports local read-only node inspection, but FlowTrace does not include a graph editor or visual flow editor.
+- Runtime playback in `report.html` is local and read-only. Static-only mode disables playback, and runtime-error playback uses partial trace data.
 - `node_details.json` remains the raw node-detail data source for future graph review features.
 - Static-vs-runtime comparison is best effort and depends on both static call resolution and runtime trace coverage.
 - Intended flow comparison ignores module-level events by default.

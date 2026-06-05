@@ -95,6 +95,7 @@ def _document(
             _section("node-details-data-section", "Node details data", f"<p><code>{_e(str(node_details_path))}</code></p>", open_=False),
             _section("technical-inventory", "Technical inventory", _technical_inventory_html(entry_path, project_root, static_result, flow_path, executed), open_=False),
             _embedded_node_details_json(node_details),
+            _embedded_runtime_events_json(runtime_result),
             _node_inspector_script(),
             "</main>",
             "</body>",
@@ -277,7 +278,11 @@ def _comparison_list(items: list[str], comparison: StaticRuntimeComparison) -> s
 
 def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: dict[str, object]) -> str:
     if runtime_result.runtime_skipped:
-        return "<p>Runtime was skipped, so no runtime flowchart is available.</p>" + _node_inspector_html()
+        return (
+            "<p>Runtime was skipped, so no runtime flowchart is available.</p>"
+            + _playback_html(runtime_result)
+            + _node_inspector_html()
+        )
 
     nodes = [_node_id(node) for node in runtime_graph.get("nodes", [])]
     edges = [
@@ -286,7 +291,7 @@ def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: d
         if isinstance(edge, dict) and edge.get("caller") and edge.get("callee")
     ]
     if not nodes and not edges:
-        return "<p>No runtime flowchart data was captured.</p>" + _node_inspector_html()
+        return "<p>No runtime flowchart data was captured.</p>" + _playback_html(runtime_result) + _node_inspector_html()
 
     unique_edges = {(caller, callee) for caller, callee, _count in edges}
     outgoing_counts: dict[str, int] = {}
@@ -309,6 +314,7 @@ def _runtime_flowchart_html(runtime_result: RuntimeTraceResult, runtime_graph: d
     if runtime_result.runtime_attempted and not runtime_result.completed:
         parts.append("<p class='hint'>Runtime did not complete; this flowchart is based on partial trace data.</p>")
     parts.append(_runtime_flowchart_svg(nodes, edges))
+    parts.append(_playback_html(runtime_result))
     parts.append(_node_inspector_html())
     return "".join(parts)
 
@@ -348,7 +354,8 @@ def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str, int]]) 
         end_y = node_y[callee]
         if node_y[callee] > node_y[caller]:
             svg_parts.append(
-                f"<line x1='{center_x:.0f}' y1='{start_y}' x2='{center_x:.0f}' y2='{end_y}' "
+                f"<line class='flow-edge' data-edge-id='{_edge_data_id(caller, callee)}' "
+                f"x1='{center_x:.0f}' y1='{start_y}' x2='{center_x:.0f}' y2='{end_y}' "
                 "stroke='#475569' stroke-width='1.6' marker-end='url(#arrow)'/>"
             )
             if count > 1:
@@ -357,7 +364,8 @@ def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str, int]]) 
         else:
             lane_x = left + box_width + 36
             svg_parts.append(
-                f"<path d='M {center_x:.0f} {start_y} L {lane_x} {start_y} L {lane_x} {end_y + box_height / 2:.0f} "
+                f"<path class='flow-edge' data-edge-id='{_edge_data_id(caller, callee)}' "
+                f"d='M {center_x:.0f} {start_y} L {lane_x} {start_y} L {lane_x} {end_y + box_height / 2:.0f} "
                 f"L {left + box_width} {end_y + box_height / 2:.0f}' fill='none' stroke='#94a3b8' "
                 "stroke-width='1.4' marker-end='url(#arrow)'/>"
             )
@@ -382,6 +390,44 @@ def _runtime_flowchart_svg(nodes: list[str], edges: list[tuple[str, str, int]]) 
 
     svg_parts.extend(["</svg>", "</div>"])
     return "".join(svg_parts)
+
+
+def _edge_data_id(caller: str, callee: str) -> str:
+    return _e(f"{caller}->{callee}")
+
+
+def _playback_html(runtime_result: RuntimeTraceResult) -> str:
+    disabled_attr = " disabled" if runtime_result.runtime_skipped else ""
+    unavailable = ""
+    if runtime_result.runtime_skipped:
+        unavailable = "<p class='playback-unavailable'>Runtime playback is unavailable because runtime was skipped.</p>"
+    partial_note = ""
+    if runtime_result.runtime_attempted and not runtime_result.completed:
+        partial_note = "<p class='hint'>Playback is based on partial runtime trace because runtime did not complete.</p>"
+    return "".join(
+        [
+            "<section class='playback-panel' aria-label='Runtime playback'>",
+            "<h3>Runtime playback</h3>",
+            "<p class='hint'>Runtime playback requires local browser JavaScript.</p>",
+            unavailable,
+            partial_note,
+            "<div class='playback-controls'>",
+            f"<button type='button' id='playback-first'{disabled_attr}>First</button>",
+            f"<button type='button' id='playback-prev'{disabled_attr}>Previous</button>",
+            f"<button type='button' id='playback-next'{disabled_attr}>Next</button>",
+            f"<button type='button' id='playback-toggle'{disabled_attr}>Play</button>",
+            f"<label>Speed <select id='playback-speed'{disabled_attr}>",
+            "<option value='1200'>Slow</option>",
+            "<option value='700' selected>Normal</option>",
+            "<option value='300'>Fast</option>",
+            "</select></label>",
+            "<span id='playback-counter' class='playback-counter'>0 / 0</span>",
+            "</div>",
+            "<div id='playback-event-detail' class='event-detail'>Runtime event details will appear here.</div>",
+            "<ol id='runtime-event-list' class='runtime-event-list'></ol>",
+            "</section>",
+        ]
+    )
 
 
 def _node_inspector_html() -> str:
@@ -409,24 +455,75 @@ def _embedded_node_details_json(node_details: list[dict[str, object]]) -> str:
     return f'<script type="application/json" id="node-details-data">{payload}</script>'
 
 
+def _embedded_runtime_events_json(runtime_result: RuntimeTraceResult) -> str:
+    events = []
+    if runtime_result.runtime_skipped:
+        events.append(
+            {
+                "index": 0,
+                "event": "runtime_skipped",
+                "function": None,
+                "file": None,
+                "line": None,
+                "caller": None,
+                "timestamp": None,
+                "error_type": None,
+                "error_message": runtime_result.runtime_skipped_reason,
+            }
+        )
+    else:
+        for index, event in enumerate(runtime_result.events):
+            events.append(
+                {
+                    "index": index,
+                    "event": event.event,
+                    "function": event.function,
+                    "file": event.file,
+                    "line": event.line,
+                    "caller": event.caller,
+                    "timestamp": event.timestamp,
+                    "error_type": event.error_type,
+                    "error_message": event.error_message,
+                }
+            )
+    payload = json.dumps(events, sort_keys=True)
+    payload = payload.replace("&", "\\u0026").replace("<", "\\u003c").replace(">", "\\u003e")
+    return f'<script type="application/json" id="runtime-events-data">{payload}</script>'
+
+
 def _node_inspector_script() -> str:
     return r"""
 <script>
 (function () {
   "use strict";
 
-  var dataEl = document.getElementById("node-details-data");
+  var nodeDataEl = document.getElementById("node-details-data");
+  var eventDataEl = document.getElementById("runtime-events-data");
   var panel = document.getElementById("node-details-panel");
-  if (!dataEl || !panel) {
+  var eventDetail = document.getElementById("playback-event-detail");
+  var eventList = document.getElementById("runtime-event-list");
+  var counter = document.getElementById("playback-counter");
+  var firstButton = document.getElementById("playback-first");
+  var prevButton = document.getElementById("playback-prev");
+  var nextButton = document.getElementById("playback-next");
+  var toggleButton = document.getElementById("playback-toggle");
+  var speedSelect = document.getElementById("playback-speed");
+  if (!nodeDataEl || !panel) {
     return;
   }
 
   var details = [];
+  var runtimeEvents = [];
   try {
-    details = JSON.parse(dataEl.textContent || "[]");
+    details = JSON.parse(nodeDataEl.textContent || "[]");
   } catch (error) {
     panel.textContent = "Node details could not be loaded.";
     return;
+  }
+  try {
+    runtimeEvents = eventDataEl ? JSON.parse(eventDataEl.textContent || "[]") : [];
+  } catch (error) {
+    runtimeEvents = [];
   }
 
   var byId = new Map();
@@ -435,6 +532,10 @@ def _node_inspector_script() -> str:
       byId.set(String(item.id), item);
     }
   });
+
+  var playbackIndex = runtimeEvents.length ? 0 : -1;
+  var playbackTimer = null;
+  var currentPlaybackNodeId = null;
 
   function appendText(parent, tagName, text, className) {
     var el = document.createElement(tagName);
@@ -473,6 +574,10 @@ def _node_inspector_script() -> str:
     return "risk-" + String(value || "none").replace(/[^a-z0-9_-]/gi, "-").toLowerCase();
   }
 
+  function edgeId(caller, callee) {
+    return String(caller || "") + "->" + String(callee || "");
+  }
+
   function decorateNode(nodeEl, detail) {
     if (!detail) {
       nodeEl.classList.add("node-detail-missing");
@@ -483,7 +588,7 @@ def _node_inspector_script() -> str:
     nodeEl.classList.add(roleClass(detail.intended_flow_role));
   }
 
-  function renderDetail(id) {
+  function renderNodeDetail(id) {
     var detail = byId.get(id);
     panel.textContent = "";
     if (!detail) {
@@ -519,31 +624,256 @@ def _node_inspector_script() -> str:
     appendJsonBlock(panel, "Diagnostics", detail.diagnostics);
   }
 
-  function selectNode(nodeEl) {
+  function selectNode(nodeEl, fromPlayback) {
     document.querySelectorAll(".flow-node.selected").forEach(function (item) {
       item.classList.remove("selected");
     });
     nodeEl.classList.add("selected");
-    renderDetail(nodeEl.getAttribute("data-node-id"));
+    if (fromPlayback) {
+      nodeEl.classList.add("playback-current");
+      currentPlaybackNodeId = nodeEl.getAttribute("data-node-id");
+    }
+    renderNodeDetail(nodeEl.getAttribute("data-node-id"));
+  }
+
+  function clearPlaybackHighlights() {
+    document.querySelectorAll(".flow-node.playback-current,.flow-node.playback-visited,.flow-node.playback-error").forEach(function (item) {
+      item.classList.remove("playback-current", "playback-visited", "playback-error");
+    });
+    document.querySelectorAll(".flow-edge.playback-current-edge").forEach(function (item) {
+      item.classList.remove("playback-current-edge");
+    });
+  }
+
+  function markVisitedThrough(index) {
+    document.querySelectorAll(".flow-node.playback-visited,.flow-node.playback-error").forEach(function (item) {
+      item.classList.remove("playback-visited", "playback-error");
+    });
+    runtimeEvents.slice(0, index + 1).forEach(function (event) {
+      if (!event || !event.function) {
+        return;
+      }
+      var nodeEl = document.querySelector(".flow-node[data-node-id='" + cssEscape(event.function) + "']");
+      if (nodeEl) {
+        nodeEl.classList.add("playback-visited");
+        if (isErrorEvent(event)) {
+          nodeEl.classList.add("playback-error");
+        }
+      }
+    });
+  }
+
+  function isErrorEvent(event) {
+    return event && (event.event === "function_error" || event.event === "runtime_error" || event.error_type || event.error_message);
+  }
+
+  function cssEscape(value) {
+    if (window.CSS && typeof window.CSS.escape === "function") {
+      return window.CSS.escape(String(value));
+    }
+    return String(value).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  }
+
+  function updateEventDetail(event, index) {
+    if (!eventDetail) {
+      return;
+    }
+    eventDetail.textContent = "";
+    appendText(eventDetail, "h4", event ? "Current runtime event" : "No runtime events captured");
+    var meta = document.createElement("dl");
+    meta.className = "node-kv";
+    appendKeyValue(meta, "step", event ? String(index + 1) + " / " + runtimeEvents.length : "0 / 0");
+    appendKeyValue(meta, "event", event && event.event);
+    appendKeyValue(meta, "function", event && event.function);
+    appendKeyValue(meta, "file", event && event.file);
+    appendKeyValue(meta, "line", event && event.line);
+    appendKeyValue(meta, "timestamp", event && event.timestamp);
+    appendKeyValue(meta, "error_type", event && event.error_type);
+    appendKeyValue(meta, "message", event && event.error_message);
+    eventDetail.appendChild(meta);
+  }
+
+  function updateCounter() {
+    if (counter) {
+      counter.textContent = runtimeEvents.length ? String(playbackIndex + 1) + " / " + runtimeEvents.length : "0 / 0";
+    }
+  }
+
+  function highlightEventRow(index) {
+    if (!eventList) {
+      return;
+    }
+    eventList.querySelectorAll(".runtime-event-row.current").forEach(function (row) {
+      row.classList.remove("current");
+    });
+    var row = eventList.querySelector("[data-step-index='" + index + "']");
+    if (row) {
+      row.classList.add("current");
+    }
+  }
+
+  function highlightIncomingEdge(event) {
+    if (!event || !event.caller || !event.function) {
+      return;
+    }
+    var id = edgeId(event.caller, event.function);
+    document.querySelectorAll(".flow-edge[data-edge-id='" + cssEscape(id) + "']").forEach(function (edge) {
+      edge.classList.add("playback-current-edge");
+    });
+  }
+
+  function renderPlaybackStep(index) {
+    if (!runtimeEvents.length) {
+      updateCounter();
+      updateEventDetail(null, -1);
+      return;
+    }
+    playbackIndex = Math.max(0, Math.min(index, runtimeEvents.length - 1));
+    var event = runtimeEvents[playbackIndex];
+    clearPlaybackHighlights();
+    markVisitedThrough(playbackIndex);
+    updateCounter();
+    updateEventDetail(event, playbackIndex);
+    highlightEventRow(playbackIndex);
+
+    if (event && event.function) {
+      var nodeEl = document.querySelector(".flow-node[data-node-id='" + cssEscape(event.function) + "']");
+      if (nodeEl) {
+        selectNode(nodeEl, true);
+        if (isErrorEvent(event)) {
+          nodeEl.classList.add("playback-error");
+        }
+      }
+      if (event.event === "function_enter") {
+        highlightIncomingEdge(event);
+      }
+    }
+  }
+
+  function stopPlayback() {
+    if (playbackTimer) {
+      window.clearInterval(playbackTimer);
+      playbackTimer = null;
+    }
+    if (toggleButton) {
+      toggleButton.textContent = "Play";
+    }
+  }
+
+  function startPlayback() {
+    if (!runtimeEvents.length || playbackTimer) {
+      return;
+    }
+    if (toggleButton) {
+      toggleButton.textContent = "Pause";
+    }
+    playbackTimer = window.setInterval(function () {
+      if (playbackIndex >= runtimeEvents.length - 1) {
+        stopPlayback();
+        return;
+      }
+      renderPlaybackStep(playbackIndex + 1);
+    }, Number(speedSelect && speedSelect.value ? speedSelect.value : 700));
+  }
+
+  function renderEventList() {
+    if (!eventList) {
+      return;
+    }
+    eventList.textContent = "";
+    if (!runtimeEvents.length) {
+      appendText(eventList, "li", "No runtime events captured.");
+      return;
+    }
+    runtimeEvents.forEach(function (event, index) {
+      var row = document.createElement("li");
+      row.className = "runtime-event-row";
+      row.setAttribute("data-step-index", String(index));
+      row.tabIndex = 0;
+      row.textContent = String(index + 1) + ". " + (event.event || "event") + " | " + (event.function || "None") + " | " + (event.file || "None") + ":" + (event.line == null ? "None" : event.line);
+      if (isErrorEvent(event)) {
+        row.classList.add("error");
+      }
+      row.addEventListener("click", function () {
+        stopPlayback();
+        renderPlaybackStep(index);
+      });
+      row.addEventListener("keydown", function (keyboardEvent) {
+        if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+          keyboardEvent.preventDefault();
+          stopPlayback();
+          renderPlaybackStep(index);
+        }
+      });
+      eventList.appendChild(row);
+    });
   }
 
   var nodes = Array.prototype.slice.call(document.querySelectorAll(".flow-node[data-node-id]"));
   nodes.forEach(function (nodeEl) {
     decorateNode(nodeEl, byId.get(nodeEl.getAttribute("data-node-id")));
     nodeEl.addEventListener("click", function () {
-      selectNode(nodeEl);
+      stopPlayback();
+      clearPlaybackHighlights();
+      selectNode(nodeEl, false);
     });
     nodeEl.addEventListener("keydown", function (event) {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        selectNode(nodeEl);
+        stopPlayback();
+        clearPlaybackHighlights();
+        selectNode(nodeEl, false);
       }
     });
   });
 
+  renderEventList();
+  if (firstButton) {
+    firstButton.addEventListener("click", function () {
+      stopPlayback();
+      renderPlaybackStep(0);
+    });
+  }
+  if (prevButton) {
+    prevButton.addEventListener("click", function () {
+      stopPlayback();
+      renderPlaybackStep(playbackIndex - 1);
+    });
+  }
+  if (nextButton) {
+    nextButton.addEventListener("click", function () {
+      stopPlayback();
+      renderPlaybackStep(playbackIndex + 1);
+    });
+  }
+  if (toggleButton) {
+    toggleButton.addEventListener("click", function () {
+      if (playbackTimer) {
+        stopPlayback();
+      } else {
+        startPlayback();
+      }
+    });
+  }
+  if (speedSelect) {
+    speedSelect.addEventListener("change", function () {
+      if (playbackTimer) {
+        stopPlayback();
+        startPlayback();
+      }
+    });
+  }
+
   var startNode = document.querySelector(".flow-node[data-node-id='PROGRAM_START']");
-  if (startNode) {
-    selectNode(startNode);
+  if (runtimeEvents.length && runtimeEvents[0].event !== "runtime_skipped") {
+    renderPlaybackStep(0);
+  } else if (startNode) {
+    selectNode(startNode, false);
+    updateCounter();
+    updateEventDetail(runtimeEvents[0] || null, 0);
+  } else {
+    updateCounter();
+    updateEventDetail(runtimeEvents[0] || null, 0);
   }
 })();
 </script>
@@ -840,8 +1170,23 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .flow-node:hover rect,.flow-node:focus rect{fill:#eff6ff;stroke:#2563eb;stroke-width:2.4}
 .flow-node.selected rect{fill:#dbeafe;stroke:#1d4ed8;stroke-width:3}
 .flow-node.node-not-executed rect{stroke-dasharray:5 3}
+.flow-node.playback-visited rect{fill:#ecfdf5}.flow-node.playback-current rect{fill:#fef3c7;stroke:#d97706;stroke-width:3.2}
+.flow-node.playback-error rect{fill:#fee2e2;stroke:#dc2626;stroke-width:3.2}
+.flow-edge.playback-current-edge{stroke:#d97706;stroke-width:3.4}
 .flow-node.risk-high rect{stroke:#dc2626}.flow-node.risk-medium rect{stroke:#d97706}.flow-node.risk-low rect{stroke:#16a34a}
 .flow-node.role-matched text{font-weight:700}.flow-node.role-missing rect{fill:#fff7ed}.flow-node.role-unexpected rect{fill:#fef2f2}
+.playback-panel{border:1px solid #d8dee9;border-radius:8px;background:#fbfcff;padding:12px;margin-top:12px}
+.playback-panel h3{margin:0 0 8px}.playback-unavailable{font-weight:700;color:#92400e}
+.playback-controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:10px 0}
+.playback-controls button,.playback-controls select{border:1px solid #cbd5e1;border-radius:6px;background:#fff;padding:5px 9px;font:inherit}
+.playback-controls button{cursor:pointer}.playback-controls button:disabled,.playback-controls select:disabled{opacity:.55;cursor:not-allowed}
+.playback-counter{font-weight:700;color:#475569}
+.event-detail{border:1px solid #e1e6ef;border-radius:6px;background:#fff;padding:10px;margin:8px 0}
+.event-detail h4{margin:0 0 8px}
+.runtime-event-list{max-height:260px;overflow:auto;background:#fff;border:1px solid #e1e6ef;border-radius:6px;padding:8px 8px 8px 30px}
+.runtime-event-row{cursor:pointer;border-radius:5px;padding:3px 5px;overflow-wrap:anywhere}
+.runtime-event-row:hover,.runtime-event-row:focus{background:#eff6ff;outline:none}.runtime-event-row.current{background:#fef3c7;font-weight:700}
+.runtime-event-row.error{color:#991b1b}
 .node-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:12px 0;color:#475569;font-size:13px}
 .node-legend span{display:inline-flex;align-items:center;gap:6px}
 .legend-swatch{display:inline-block;width:14px;height:14px;border-radius:3px;border:2px solid #94a3b8;background:#f8fafc}

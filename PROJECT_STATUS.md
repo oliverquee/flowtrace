@@ -27,6 +27,7 @@ Gmail automation project static-only scan works.
 ## In Progress
 
 - V0.5: Local interactive HTML node inspection is in progress on a feature branch. This is not yet claimed as stable.
+- V0.6: Local runtime playback in `report.html` is in progress on a feature branch. This is not yet claimed as stable.
 
 ## Known Limitations
 
