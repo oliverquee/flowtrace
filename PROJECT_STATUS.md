@@ -3,8 +3,8 @@
 ## Stable Baseline
 
 - Current stable branch: main
-- Current stable version: V0.5
-- Latest stable commit: 8f8d121
+- Current stable version: V0.6
+- Latest stable commit: d7403b6
 
 ## Current Tested Commands
 
@@ -26,7 +26,7 @@ Gmail automation project static-only scan works.
 
 ## In Progress
 
-- V0.6: Local runtime playback in `report.html` is in progress on a feature branch. This is not yet claimed as stable.
+
 
 ## Known Limitations
 
