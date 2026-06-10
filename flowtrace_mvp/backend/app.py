@@ -1,0 +1,59 @@
+"""FastAPI app for the local FlowTrace MVP.
+
+Run from repo root:
+    python -m uvicorn flowtrace_mvp.backend.app:app --reload
+
+Then open:
+    http://127.0.0.1:8000
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from .tracer import trace_code
+
+BASE_DIR = Path(__file__).resolve().parents[1]
+STATIC_DIR = BASE_DIR / "static"
+SAMPLES_DIR = BASE_DIR / "samples"
+
+app = FastAPI(title="FlowTrace MVP", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+class TraceRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=50_000)
+
+
+@app.get("/", response_class=HTMLResponse)
+def index() -> str:
+    return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+
+
+@app.get("/api/sample")
+def sample() -> dict[str, str]:
+    sample_path = SAMPLES_DIR / "simple_assignment.py"
+    return {"code": sample_path.read_text(encoding="utf-8")}
+
+
+@app.post("/api/trace")
+def trace(request: TraceRequest) -> dict:
+    try:
+        return trace_code(request.code)
+    except SyntaxError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"type": "SyntaxError", "message": str(exc), "line": exc.lineno},
+        ) from exc
