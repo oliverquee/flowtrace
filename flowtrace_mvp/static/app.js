@@ -27,10 +27,10 @@ function renderInspector(edge) {
   inspectorEl.innerHTML = "";
 
   const title = document.createElement("h3");
-  title.textContent = `line ${edge.from_line} → line ${edge.to_line}`;
+  title.textContent = `line ${edge.from_line} -> line ${edge.to_line}`;
 
   const meta = document.createElement("p");
-  meta.textContent = `event ${edge.event_id}${edge.terminal ? " · terminal snapshot" : ""}`;
+  meta.textContent = `event ${edge.event_id}${edge.terminal ? " - terminal snapshot" : ""}`;
 
   const values = document.createElement("pre");
   values.textContent = formatValueMap(edge.changed_vars);
@@ -52,7 +52,7 @@ function renderGraph(trace) {
   const edges = trace.edges || [];
   const nodesById = nodeById(nodes);
 
-  summaryEl.textContent = `${nodes.length} blocks · ${edges.length} runtime arrows`;
+  summaryEl.textContent = `${nodes.length} blocks - ${edges.length} runtime arrows`;
   stdoutEl.textContent = trace.stdout || "";
   errorEl.textContent = trace.error ? JSON.stringify(trace.error, null, 2) : "";
 
@@ -76,7 +76,7 @@ function renderGraph(trace) {
 
     const line = document.createElement("div");
     line.className = "node-line";
-    line.textContent = `Line ${node.line} · ${node.type}`;
+    line.textContent = `Line ${node.line} - ${node.type}`;
 
     const label = document.createElement("code");
     label.textContent = node.label;
@@ -90,12 +90,12 @@ function renderGraph(trace) {
       const arrow = document.createElement("button");
       arrow.className = "edge";
       arrow.type = "button";
-      arrow.textContent = `↓ line ${edge.from_line} → ${edge.to_line}`;
+      arrow.textContent = `down line ${edge.from_line} -> ${edge.to_line}`;
       if (target && target.line < node.line) {
-        arrow.textContent = `↺ line ${edge.from_line} → ${edge.to_line}`;
+        arrow.textContent = `loop line ${edge.from_line} -> ${edge.to_line}`;
       }
       if (edge.terminal) {
-        arrow.textContent = `● final line ${edge.from_line}`;
+        arrow.textContent = `final line ${edge.from_line}`;
       }
       arrow.addEventListener("click", () => renderInspector(edge));
       graphEl.appendChild(arrow);
