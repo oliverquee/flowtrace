@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FlowTrace MVP</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <h1>FlowTrace MVP</h1>
+      <p>Paste Python code, run a local trace, click an arrow, inspect changed values.</p>
+    </div>
+    <button id="load-sample">Load sample</button>
+  </header>
+
+  <main>
+    <section class="pane editor-pane">
+      <div class="pane-title">
+        <h2>Python code</h2>
+        <button id="run-trace">Run Trace</button>
+      </div>
+      <textarea id="code-input" spellcheck="false">x = 5
+y = x + 2
+print(y)</textarea>
+      <pre id="status" class="status">Ready.</pre>
+    </section>
+
+    <section class="pane graph-pane">
+      <div class="pane-title">
+        <h2>Runtime flow</h2>
+        <span id="summary"></span>
+      </div>
+      <div id="graph" class="graph"></div>
+    </section>
+
+    <section class="pane inspector-pane">
+      <h2>Arrow inspector</h2>
+      <div id="inspector" class="inspector empty">
+        Click an arrow after running a trace.
+      </div>
+      <h3>Stdout</h3>
+      <pre id="stdout" class="stdout"></pre>
+      <h3>Error</h3>
+      <pre id="error" class="error"></pre>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
