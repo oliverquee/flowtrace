@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .tracer import trace_code
+from .runner import run_trace_subprocess
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = BASE_DIR / "static"
@@ -50,10 +50,4 @@ def sample() -> dict[str, str]:
 
 @app.post("/api/trace")
 def trace(request: TraceRequest) -> dict:
-    try:
-        return trace_code(request.code)
-    except SyntaxError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail={"type": "SyntaxError", "message": str(exc), "line": exc.lineno},
-        ) from exc
+    return run_trace_subprocess(request.code)

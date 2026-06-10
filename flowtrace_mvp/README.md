@@ -62,4 +62,8 @@ Not in scope yet:
 
 ## Safety note
 
-This MVP executes pasted Python code locally. Do not run unknown code. For future SaaS usage, runtime execution must be moved into a real sandbox.
+This MVP is local-only. Pasted Python code is traced in a separate local Python subprocess with a timeout instead of running directly inside the FastAPI server process.
+
+That is safer and less fragile than in-process execution, but it is not a full sandbox. Code can still run on your machine while the subprocess is alive, so do not casually run unknown or untrusted code.
+
+For future SaaS usage, runtime execution must be moved into a real sandbox.

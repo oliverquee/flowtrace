@@ -12,6 +12,7 @@ import builtins
 import contextlib
 import io
 import sys
+import time
 import traceback
 from types import FrameType
 from typing import Any
@@ -59,7 +60,7 @@ def _edge_id(from_line: int, to_line: int, index: int) -> str:
     return f"edge_{from_line}_{to_line}_{index}"
 
 
-def trace_code(source: str) -> dict:
+def trace_code(source: str, timeout_seconds: float | None = None) -> dict:
     """Execute source and return nodes, runtime edges, and trace events.
 
     The trace event for transition A -> B contains values produced by A and
@@ -76,6 +77,7 @@ def trace_code(source: str) -> dict:
     previous_snapshot: dict[str, str] = {}
     event_index = 0
     execution_error: dict | None = None
+    deadline = time.monotonic() + timeout_seconds if timeout_seconds is not None else None
 
     def add_transition(from_line: int, to_line: int, frame: FrameType) -> None:
         nonlocal previous_snapshot, event_index
@@ -109,6 +111,9 @@ def trace_code(source: str) -> dict:
 
         if frame.f_code.co_filename != USER_FILENAME:
             return tracer
+
+        if deadline is not None and time.monotonic() > deadline:
+            raise TimeoutError(f"Execution timed out after {timeout_seconds:g} seconds.")
 
         if event == "line":
             current_line = frame.f_lineno
