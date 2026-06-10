@@ -137,6 +137,9 @@ function clearSelection() {
   document.querySelectorAll(".edge.selected, .path-row.selected").forEach((item) => {
     item.classList.remove("selected");
   });
+  document.querySelectorAll(".node.node-source, .node.node-target").forEach((node) => {
+    node.classList.remove("node-source", "node-target");
+  });
 }
 
 function selectEdge(edgeId) {
@@ -149,6 +152,10 @@ function selectEdge(edgeId) {
   document.querySelectorAll(`[data-edge-id="${CSS.escape(edgeId)}"]`).forEach((item) => {
     item.classList.add("selected");
   });
+  const sourceEl = document.getElementById(edge.source);
+  const targetEl = document.getElementById(edge.target);
+  if (sourceEl) sourceEl.classList.add("node-source");
+  if (targetEl) targetEl.classList.add("node-target");
   renderInspector(edge);
 }
 
@@ -201,7 +208,9 @@ function edgeLabel(edge, target, node) {
     return `final line ${edge.from_line}`;
   }
   if (target && target.line < node.line) {
-    return `loop line ${edge.from_line} -> ${edge.to_line}`;
+    const names = changedVariableNames(edge);
+    const varPart = names.length ? ` | ${names[0]}` : "";
+    return `loop line ${edge.from_line} -> ${edge.to_line}${varPart}`;
   }
   return `line ${edge.from_line} -> ${edge.to_line}`;
 }

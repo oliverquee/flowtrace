@@ -147,6 +147,16 @@ textarea {
   box-shadow: inset 3px 0 0 #8b949e;
 }
 
+.node.node-source {
+  border-color: #f2cc60;
+  box-shadow: inset 3px 0 0 #f2cc60;
+}
+
+.node.node-target {
+  border-color: #58a6ff;
+  box-shadow: inset 3px 0 0 #58a6ff;
+}
+
 .node-line {
   color: #8b949e;
   font-size: 12px;
