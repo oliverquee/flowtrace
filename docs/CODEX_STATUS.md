@@ -9,7 +9,7 @@ feature/mvp-runtime-edge-values
 ## Starting commit hash
 
 ```text
-a34fd2f4ec15820ba6d5072037bab3b4b20d85a5
+740f9a1267d4d8aa1e4330881fcaa9205ece952c
 ```
 
 ## Scope
@@ -27,21 +27,35 @@ The old `flowtrace/` CLI/report implementation was not modified.
 
 ```text
 docs/CODEX_STATUS.md
-flowtrace_mvp/README.md
-flowtrace_mvp/backend/app.py
-flowtrace_mvp/backend/runner.py
-flowtrace_mvp/backend/tracer.py
-flowtrace_mvp/tests/test_tracer.py
+flowtrace_mvp/static/app.js
+flowtrace_mvp/static/index.html
+flowtrace_mvp/static/style.css
 ```
 
 ## Implementation summary
 
-- Added `flowtrace_mvp/backend/runner.py`.
-- Routed FastAPI `/api/trace` through the subprocess runner instead of calling `trace_code` directly in the server process.
-- The runner accepts pasted code, launches a separate Python subprocess, enforces a default 5 second timeout, captures stdout/stderr, and returns the same response shape: `nodes`, `edges`, `trace_events`, `stdout`, and `error`.
-- Kept `trace_code` usable directly for tests.
-- Added an internal tracing deadline so runaway line tracing can return a timeout error before producing an oversized trace.
-- Updated README safety notes to explain local subprocess execution and the remaining non-sandbox risk.
+- Added five built-in frontend samples:
+  - Assignment
+  - If branch
+  - Loop
+  - Runtime error
+  - Timeout
+- Added a sample selector and load button.
+- Expanded the edge inspector to show:
+  - event id
+  - from line
+  - to line
+  - source code for from line
+  - source code for to line
+  - changed variables
+  - locals snapshot
+  - stdout at that moment
+  - terminal edge flag
+  - loop-back edge flag
+- Added an execution path panel with ordered runtime event rows.
+- Clicking an execution path row selects the matching edge and updates the inspector.
+- Added visual classes for executed nodes, non-executed nodes, selected edges, loop-back edges, and terminal edges.
+- Preserved the existing API response shape.
 
 ## Commands run
 
@@ -54,13 +68,9 @@ Output summary:
 ```text
 Listing 'flowtrace_mvp'...
 Listing 'flowtrace_mvp\\backend'...
-Compiling 'flowtrace_mvp\\backend\\app.py'...
-Compiling 'flowtrace_mvp\\backend\\runner.py'...
-Compiling 'flowtrace_mvp\\backend\\tracer.py'...
 Listing 'flowtrace_mvp\\samples'...
 Listing 'flowtrace_mvp\\static'...
 Listing 'flowtrace_mvp\\tests'...
-Compiling 'flowtrace_mvp\\tests\\test_tracer.py'...
 ```
 
 ### `python -m pytest flowtrace_mvp/tests`
@@ -77,74 +87,33 @@ collected 6 items
 
 flowtrace_mvp\tests\test_tracer.py ......                                [100%]
 
-6 passed in 1.07s
+6 passed in 1.12s
 ```
 
 ### `python -m uvicorn flowtrace_mvp.backend.app:app --reload`
-
-Status: PASS for startup confirmation
-
-Output summary:
-
-```text
-INFO:     Will watch for changes in these directories: ['D:\\FlowTrace']
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-INFO:     Started reloader process [27632] using StatReload
-INFO:     Started server process [11196]
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-process_running_after_5s=True
-```
-
-The server was stopped after startup confirmation.
-
-## Test coverage added
-
-- Runtime exception through subprocess runner.
-- Timeout through subprocess runner using `while True: pass`.
-- Stdout capture through subprocess runner.
-- Existing assignment, if branch, and loop tests still pass.
-
-## Manual checks
-
-### Requested URL
-
-```text
-http://127.0.0.1:8000
-```
-
-The exact uvicorn startup command starts successfully on port 8000. During repeated manual timeout checks, Windows intermittently reported a stale listener on port 8000 owned by PID `19244`, while process APIs could not inspect or kill that PID:
-
-```text
-LocalAddress LocalPort State  OwningProcess
-127.0.0.1    8000      Listen 19244
-```
-
-This made the 8000 timeout browser/API check unreliable in this session. The code-level timeout behavior was therefore verified through tests, direct runner checks, and a supplemental current-app run on port 8001.
-
-### Supplemental current-app check on port 8001
 
 Status: PASS
 
 Output summary:
 
-```json
-{
-  "page_status": 200,
-  "sample_loaded": true,
-  "blocks": 3,
-  "arrows": 3,
-  "final_changed_vars": {
-    "y": "7"
-  },
-  "stdout": "hello stdout\n",
-  "timeout_elapsed": 5.13,
-  "timeout_error_type": "TimeoutError",
-  "timeout_error_message": "Execution timed out after 5 seconds."
-}
+```text
+HTTP status: 200
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [34284] using StatReload
+INFO:     Started server process [34964]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
 ```
 
-### Headless browser check on port 8001
+Server was stopped after startup confirmation.
+
+## Manual browser check results
+
+Used installed Microsoft Edge in headless mode through the Chrome DevTools Protocol against:
+
+```text
+http://127.0.0.1:8000
+```
 
 Status: PASS
 
@@ -153,52 +122,88 @@ Output summary:
 ```json
 {
   "title": "FlowTrace MVP",
-  "blocks": 3,
-  "arrows": 2,
-  "inspector_after_arrow_click": "line 1 -> line 2event 0x = 5",
-  "stdout_after_print": "hello stdout\n"
+  "sample_count": 5,
+  "assignment": {
+    "status": "Trace complete.",
+    "blocks": 3,
+    "arrows": 2,
+    "stdout": "7\n",
+    "error": ""
+  },
+  "edge_click_inspector_contains_y7": true,
+  "path_row_click_inspector_contains_y7": true,
+  "if_branch": {
+    "status": "Trace complete.",
+    "blocks": 5,
+    "arrows": 3,
+    "non_executed_nodes": 1,
+    "stdout": "big\n",
+    "error": ""
+  },
+  "loop": {
+    "status": "Trace complete.",
+    "blocks": 4,
+    "arrows": 8,
+    "loop_edges": 3,
+    "stdout": "3\n",
+    "error": ""
+  },
+  "runtime_error": {
+    "status": "Trace completed with ZeroDivisionError.",
+    "blocks": 3,
+    "arrows": 1,
+    "non_executed_nodes": 1
+  },
+  "timeout": {
+    "status": "Trace completed with TimeoutError.",
+    "blocks": 2,
+    "arrows": 0,
+    "error": "Execution timed out after 5 seconds."
+  }
 }
 ```
 
+Checklist:
+
+- Page loads: PASS
+- Each sample loads: PASS
+- Run Trace works for Assignment: PASS
+- Run Trace works for If branch: PASS
+- Run Trace works for Loop: PASS
+- Runtime error sample shows error clearly: PASS
+- Timeout sample returns timeout error clearly: PASS
+- Clicking an edge updates the inspector: PASS
+- Clicking an execution path row selects the edge: PASS
+- Stdout appears when present: PASS
+- Non-executed else branch remains visually distinct from executed path: PASS
+
 ## Bugs found
 
-- Pasted code was executed directly in the FastAPI process via `trace_code`.
-- The first subprocess timeout implementation relied only on the parent process timeout. The direct runner timeout worked, but HTTP timeout verification exposed that runaway line tracing could still make the local server check unreliable in this Windows session.
-- Port 8000 had an intermittent stale listener during manual verification.
-
-## Exact error messages
-
-Port 8000 stale listener symptom:
-
-```text
-Invoke-WebRequest : The request was aborted: The operation has timed out.
-```
-
-Port ownership check:
-
-```text
-LocalAddress LocalPort State  OwningProcess
-127.0.0.1    8000      Listen 19244
-```
+- The previous single-sample UI was too thin for demos.
+- The old edge inspector only showed changed variables, so users could not see source-line context, locals snapshots, stdout-at-event, or edge flags.
+- There was no ordered execution path panel.
+- Selected edges and loop-back/terminal edges were not visually distinct enough.
 
 ## Fixes applied
 
-- Added subprocess runner with timeout and stderr capture.
-- Routed `/api/trace` through `run_trace_subprocess`.
-- Added child-side trace deadline for long-running code.
-- Added subprocess runner tests for runtime exception, timeout, and stdout.
-- Updated README safety note.
+- Added multiple built-in samples in frontend JavaScript.
+- Added sample selector UI in HTML.
+- Added richer edge inspector rendering.
+- Added execution path panel and row-to-edge selection.
+- Added CSS states for executed, non-executed, selected, loop-back, and terminal elements.
 
 ## Remaining risks
 
-- This is safer than in-process execution, but it is not a full sandbox.
-- Pasted code still runs locally with the user's machine permissions while the subprocess is alive.
-- The timeout is a guardrail, not a security boundary.
-- Port 8000 had a stale Windows listener during verification; if it reappears, stop the stale process or use another local port for testing.
+- This is still a local MVP, not a sandboxed execution environment.
+- Timeout is a guardrail, not a full security boundary.
+- The UI is intentionally plain HTML/CSS/JS and not yet a full editor.
+- Runtime tracing remains line/event based and does not explain complex Python semantics.
 
-## Runnable status
+## Demo-ready status
 
-The MVP is runnable locally when port 8000 is free:
+The local browser MVP is demo-ready for V0.1.2 clarity checks.
+
+Run:
 
 ```powershell
 python -m uvicorn flowtrace_mvp.backend.app:app --reload

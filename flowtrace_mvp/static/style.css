@@ -36,6 +36,17 @@ header p {
   color: #8b949e;
 }
 
+.sample-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sample-controls label {
+  color: #8b949e;
+  font-size: 13px;
+}
+
 main {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.2fr) minmax(280px, 0.8fr);
@@ -67,6 +78,14 @@ button {
   padding: 8px 12px;
   cursor: pointer;
   font-weight: 600;
+}
+
+select {
+  border: 1px solid #30363d;
+  background: #0d1117;
+  color: #e6edf3;
+  border-radius: 8px;
+  padding: 8px 10px;
 }
 
 button:disabled {
@@ -119,11 +138,13 @@ textarea {
 
 .node.executed {
   border-color: #2ea043;
+  box-shadow: inset 3px 0 0 #2ea043;
 }
 
 .node.not-executed {
   opacity: 0.55;
   border-style: dashed;
+  box-shadow: inset 3px 0 0 #8b949e;
 }
 
 .node-line {
@@ -149,8 +170,75 @@ code {
   border-color: #58a6ff;
 }
 
+.edge.selected,
+.path-row.selected {
+  border-color: #f2cc60;
+  background: #3b2f0b;
+  color: #f8e3a1;
+}
+
+.edge.loop-back {
+  border-color: #d2a8ff;
+}
+
+.edge.terminal {
+  border-color: #f85149;
+}
+
+.inspector-grid {
+  display: grid;
+  grid-template-columns: minmax(92px, 132px) minmax(0, 1fr);
+  gap: 6px 10px;
+  margin: 0 0 12px;
+}
+
+.inspector-grid dt {
+  color: #8b949e;
+  font-weight: 700;
+}
+
+.inspector-grid dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.inspector h4 {
+  margin: 12px 0 6px;
+}
+
 .inspector.empty {
   color: #8b949e;
+}
+
+.path-panel {
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #0d1117;
+  padding: 10px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.path-panel.empty {
+  color: #8b949e;
+}
+
+.path-list {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.path-list li {
+  margin: 6px 0;
+}
+
+.path-row {
+  width: 100%;
+  text-align: left;
+  border-color: #30363d;
+  background: #161b22;
+  color: #e6edf3;
+  font-weight: 500;
 }
 
 #error:empty::before,

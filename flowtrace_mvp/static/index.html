@@ -12,7 +12,11 @@
       <h1>FlowTrace MVP</h1>
       <p>Paste Python code, run a local trace, click an arrow, inspect changed values.</p>
     </div>
-    <button id="load-sample">Load sample</button>
+    <div class="sample-controls">
+      <label for="sample-select">Sample</label>
+      <select id="sample-select"></select>
+      <button id="load-sample">Load sample</button>
+    </div>
   </header>
 
   <main>
@@ -40,6 +44,12 @@ print(y)</textarea>
       <div id="inspector" class="inspector empty">
         Click an arrow after running a trace.
       </div>
+
+      <h2>Execution path</h2>
+      <div id="path-panel" class="path-panel empty">
+        Run a trace to see ordered runtime events.
+      </div>
+
       <h3>Stdout</h3>
       <pre id="stdout" class="stdout"></pre>
       <h3>Error</h3>
