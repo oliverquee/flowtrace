@@ -72,3 +72,17 @@ def test_changed_variable_event_format_is_before_after_object():
 
     assert event_with_x is not None
     assert event_with_x["changed_vars"]["x"] == {"before": "(new)", "after": "5"}
+
+
+def test_same_line_statements_create_distinct_nodes():
+    graph = build_graph_model("x = 1; y = 2\n", [])
+
+    assert [node["id"] for node in graph["nodes"]] == ["n_1", "n_1_2"]
+    assert [node["line"] for node in graph["nodes"]] == [1, 1]
+
+
+def test_graph_model_output_has_no_private_group_fields():
+    graph = graph_for("if True:\n    print('yes')\n")
+
+    for group in graph["groups"]:
+        assert all(not key.startswith("_") for key in group)

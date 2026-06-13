@@ -46,9 +46,8 @@ def build_graph_model(source_code: str, trace_events: list[dict]) -> GraphDict:
     lines = source_code.splitlines()
     tree = ast.parse(source_code, filename="<flowtrace_user_code>")
     statements = list(_iter_statement_nodes(tree))
-    statement_by_line = _dedupe_statements_by_line(statements)
-    nodes = _build_nodes(statement_by_line, lines, trace_events)
-    line_to_node_id = {node["line"]: node["id"] for node in nodes}
+    nodes = _build_nodes(statements, lines, trace_events)
+    line_to_node_id = _first_node_id_by_line(nodes)
 
     groups = _build_groups(statements, nodes)
     _assign_node_groups(nodes, groups)
@@ -97,29 +96,19 @@ def _child_statement_bodies(stmt: ast.stmt) -> list[list[ast.stmt]]:
     return [body for body in bodies if body]
 
 
-def _dedupe_statements_by_line(statements: list[ast.stmt]) -> list[ast.stmt]:
-    """Keep one statement per starting source line."""
-    seen: set[int] = set()
-    result: list[ast.stmt] = []
-    for stmt in sorted(statements, key=lambda item: getattr(item, "lineno", 0)):
-        line = getattr(stmt, "lineno", None)
-        if line is None or line in seen:
-            continue
-        seen.add(line)
-        result.append(stmt)
-    return result
-
-
 def _build_nodes(statements: list[ast.stmt], lines: list[str], trace_events: list[dict]) -> list[GraphDict]:
     """Create GraphModel node dicts from AST statements."""
     execution_counts = _node_execution_counts(trace_events)
+    line_seen: Counter[int] = Counter()
     nodes: list[GraphDict] = []
-    for stmt in statements:
+    for stmt in sorted(statements, key=lambda item: (getattr(item, "lineno", 0), getattr(item, "col_offset", 0))):
         line = int(getattr(stmt, "lineno"))
+        line_seen[line] += 1
+        node_id = f"n_{line}" if line_seen[line] == 1 else f"n_{line}_{line_seen[line]}"
         execution_count = execution_counts.get(line, 0)
         nodes.append(
             {
-                "id": f"n_{line}",
+                "id": node_id,
                 "line": line,
                 "code": _source_line(lines, line),
                 "type": _node_type(stmt),
@@ -129,6 +118,14 @@ def _build_nodes(statements: list[ast.stmt], lines: list[str], trace_events: lis
             }
         )
     return nodes
+
+
+def _first_node_id_by_line(nodes: list[GraphDict]) -> dict[int, str]:
+    """Map each source line to the first node created for that line."""
+    result: dict[int, str] = {}
+    for node in nodes:
+        result.setdefault(node["line"], node["id"])
+    return result
 
 
 def _node_execution_counts(trace_events: list[dict]) -> Counter[int]:
