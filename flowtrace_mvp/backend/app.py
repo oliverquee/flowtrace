@@ -23,11 +23,17 @@ from .runner import run_trace_subprocess
 BASE_DIR = Path(__file__).resolve().parents[1]
 STATIC_DIR = BASE_DIR / "static"
 SAMPLES_DIR = BASE_DIR / "samples"
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+]
 
 app = FastAPI(title="FlowTrace MVP", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
@@ -36,12 +42,19 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 class TraceRequest(BaseModel):
     code: str = Field(min_length=1, max_length=50_000)
+    stdin: str = ""
 
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     """Return the local MVP page."""
     return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Return a lightweight backend readiness signal."""
+    return {"status": "ok"}
 
 
 @app.get("/api/sample")
