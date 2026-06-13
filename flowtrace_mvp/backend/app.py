@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .graph_builder import build_graph_model
 from .runner import run_trace_subprocess
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -39,15 +40,30 @@ class TraceRequest(BaseModel):
 
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
+    """Return the local MVP page."""
     return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
 
 
 @app.get("/api/sample")
 def sample() -> dict[str, str]:
+    """Return the default sample code."""
     sample_path = SAMPLES_DIR / "simple_assignment.py"
     return {"code": sample_path.read_text(encoding="utf-8")}
 
 
 @app.post("/api/trace")
 def trace(request: TraceRequest) -> dict:
+    """Trace pasted code through the subprocess runner."""
     return run_trace_subprocess(request.code)
+
+
+@app.post("/api/graph")
+def graph(request: TraceRequest) -> dict:
+    """Return a GraphModel built from the subprocess trace result."""
+    result = run_trace_subprocess(request.code)
+    graph_model = build_graph_model(request.code, result.get("trace_events", []))
+    return {
+        "graph": graph_model,
+        "stdout": result.get("stdout", ""),
+        "error": result.get("error"),
+    }
