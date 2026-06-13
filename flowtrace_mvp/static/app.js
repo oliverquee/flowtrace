@@ -65,6 +65,24 @@ function formatValueMap(values) {
   return entries.map(([key, value]) => `${key} = ${value}`).join("\n");
 }
 
+function formatTransitionChanges(edge) {
+  const entries = Object.entries(edge.changed_vars || {});
+  if (entries.length === 0) {
+    return "No visible variable changes on this transition.";
+  }
+
+  const previousEvent = (lastTrace.trace_events || [])[edge.event_id - 1];
+  const previousSnapshot = previousEvent?.locals_snapshot || {};
+  return entries
+    .map(([key, after]) => {
+      const before = Object.prototype.hasOwnProperty.call(previousSnapshot, key)
+        ? previousSnapshot[key]
+        : "(new)";
+      return `${key}: ${before} -> ${after}`;
+    })
+    .join("\n");
+}
+
 function changedVariableNames(edge) {
   return Object.keys(edge.changed_vars || {});
 }
@@ -109,7 +127,7 @@ function renderInspector(edge) {
   const changedTitle = document.createElement("h4");
   changedTitle.textContent = "Changed variables";
   const changed = document.createElement("pre");
-  changed.textContent = formatValueMap(edge.changed_vars);
+  changed.textContent = formatTransitionChanges(edge);
 
   const localsTitle = document.createElement("h4");
   localsTitle.textContent = "Locals snapshot";
