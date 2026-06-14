@@ -1,12 +1,12 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 2 - /api/graph endpoint complete
+Step 3 - Frontend scaffold complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
 - [x] Step 2: /api/graph endpoint
-- [ ] Step 3: Frontend scaffold
+- [x] Step 3: Frontend scaffold
 - [ ] Step 4: CodeNode.jsx
 - [ ] Step 5: FlowEdge.jsx
 - [ ] Step 6: InspectorPanel.jsx
@@ -14,26 +14,28 @@ Step 2 - /api/graph endpoint complete
 - [ ] Step 8: App.jsx
 
 ## Last Codex output
-Patched and verified Step 2 backend readiness for the upcoming Vite frontend.
+Scaffolded and verified Step 3 frontend setup.
 
 What was checked:
-- `/api/graph` response shape remains unchanged.
-- `/health` is registered as a GET endpoint and returns `{"status": "ok"}`.
-- CORS allows the existing local MVP origins and Vite dev origins on port 5173.
-- `TraceRequest` accepts `code` only.
-- `TraceRequest` accepts `code` plus optional `stdin`.
-- Existing `/api/graph` tests still pass.
-- Existing `/api/trace` tests still pass.
+- Created `flowtrace_mvp/frontend/` with Vite, React, React Flow, and Dagre dependencies.
+- Added `package.json`, `package-lock.json`, `index.html`, `src/main.jsx`, `src/App.jsx`, `src/styles.css`, and `src/components/`.
+- `App.jsx` renders only `FlowTrace loading...`.
+- `main.jsx` uses the standard React `createRoot` entry point.
+- Global CSS includes the requested dark background, font setup, and graph color custom properties.
+- No API calls, React Router, testing libraries, component logic, or frontend wiring were added.
 
 Fix applied:
-- Added Vite frontend origins to CORS.
-- Added the `/health` readiness endpoint.
-- Added optional `stdin` to the API request model without wiring it into runner execution.
-- Added dependency-free backend tests for readiness behavior.
+- Added a frontend-local `.gitignore` so `node_modules/` and `dist/` stay uncommitted.
 
 Verification:
-- `python -m compileall flowtrace_mvp` passed.
-- `python -m pytest flowtrace_mvp/tests` passed with 24 tests.
+- `npm install` passed.
+- `npm run build` passed.
+
+Dev command:
+- `npm run dev`
+
+Expected dev URL:
+- http://localhost:5173/
 
 ## Last ChatGPT baseline output
 Added an initial `flowtrace_mvp/backend/graph_builder.py` and `flowtrace_mvp/tests/test_graph_builder.py` baseline for Step 1.
@@ -51,7 +53,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1 and Step 2 are verified. Do not start Step 3 until explicitly requested.
+Step 1, Step 2, and Step 3 are verified. Do not start Step 4 until explicitly requested.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -67,5 +69,8 @@ Assumptions in the Step 1 baseline:
 - Vite frontend origins are allowed by CORS: `http://127.0.0.1:5173` and `http://localhost:5173`.
 - `/health` exists for simple backend readiness checks.
 - `stdin` is accepted by the request model but is not wired into runner execution yet.
+- Step 3 used Vite defaults and did not add a custom `vite.config.js`.
+- React Flow and Dagre are installed but not wired into app logic yet.
+- Step 4 component implementation remains untouched.
 
-Codex completed the Step 2 readiness patch and did not start Step 3.
+Codex completed the Step 3 frontend scaffold and did not start Step 4.

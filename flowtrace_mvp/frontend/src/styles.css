@@ -1,0 +1,40 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --node-executed: #22C55E;
+  --node-skipped: #6B7280;
+  --edge-active: #4A9EFF;
+  --edge-inactive: #374151;
+  --group-loop: #F59E0B;
+  --group-function: #8B5CF6;
+  --group-if: #06B6D4;
+
+  color: #F9FAFB;
+  background: #0f0f0f;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body {
+  background: #0f0f0f;
+}
+
+code,
+pre {
+  font-family: "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+}
