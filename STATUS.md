@@ -1,7 +1,7 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 5 - FlowEdge.jsx complete
+Step 6 - InspectorPanel.jsx complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
@@ -9,24 +9,24 @@ Step 5 - FlowEdge.jsx complete
 - [x] Step 3: Frontend scaffold
 - [x] Step 4: CodeNode.jsx
 - [x] Step 5: FlowEdge.jsx
-- [ ] Step 6: InspectorPanel.jsx
+- [x] Step 6: InspectorPanel.jsx
 - [ ] Step 7: GroupNode.jsx
 - [ ] Step 8: App.jsx
 
 ## Last Codex output
-Built and verified the Step 5 `FlowEdge.jsx` React Flow custom edge.
+Built and verified the Step 6 `InspectorPanel.jsx` edge inspector component.
 
 What was checked:
-- `FlowEdge.jsx` is a stateless custom React Flow edge.
-- It uses React Flow `getBezierPath` and `EdgeLabelRenderer`.
-- Executed edges use active solid styling, skipped edges use inactive dashed styling, and highlighted edges use brighter wider styling.
-- Repeated execution counts render as midpoint badges such as `6x`.
-- Edge clicks call `data.onEdgeClick(id)` when provided.
-- No API calls, InspectorPanel, GroupNode, App wiring, or Step 6 work were added.
+- `InspectorPanel.jsx` renders nothing when `edge` is null.
+- It renders a fixed right sidebar when an edge is selected.
+- It resets selected pass state to the latest pass when the selected edge changes.
+- It displays source/target, close button, pass tabs, changed variables, stdout, and errors.
+- Changed variables use the GraphModel `{ before, after }` format.
+- No API calls, GroupNode, App wiring, or Step 7 work were added.
 
 Fix applied:
-- Added `flowtrace_mvp/frontend/src/components/FlowEdge.jsx`.
-- Added minimal FlowEdge badge CSS while preserving existing custom properties and global scaffold styling.
+- Added `flowtrace_mvp/frontend/src/components/InspectorPanel.jsx`.
+- Added minimal InspectorPanel CSS while preserving existing custom properties and global scaffold styling.
 
 Verification:
 - `npm run build` passed.
@@ -48,7 +48,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1, Step 2, Step 3, Step 4, and Step 5 are verified. Do not start Step 6 until explicitly requested.
+Step 1, Step 2, Step 3, Step 4, Step 5, and Step 6 are verified. Do not start Step 7 until explicitly requested.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -68,5 +68,6 @@ Assumptions in the Step 1 baseline:
 - React Flow and Dagre are installed but not wired into app logic yet.
 - `CodeNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 - `FlowEdge.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
+- `InspectorPanel.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 
-Codex completed the Step 5 FlowEdge component and did not start Step 6.
+Codex completed the Step 6 InspectorPanel component and did not start Step 7.
