@@ -1,7 +1,7 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 7 - GroupNode.jsx complete
+Step 8 - App.jsx wiring complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
@@ -11,26 +11,32 @@ Step 7 - GroupNode.jsx complete
 - [x] Step 5: FlowEdge.jsx
 - [x] Step 6: InspectorPanel.jsx
 - [x] Step 7: GroupNode.jsx
-- [ ] Step 8: App.jsx
+- [x] Step 8: App.jsx
 
 ## Last Codex output
-Built and verified the Step 7 `GroupNode.jsx` collapsible group node component.
+Built and verified the Step 8 React Flow demo app wiring.
 
 What was checked:
-- `GroupNode.jsx` is a stateless React Flow node.
-- It uses top target and bottom source handles.
-- It renders loop, function, and if-block group icons and dashed borders.
-- It shows run count, input/output variables, status badge, and expand/collapse button.
-- Expansion remains parent-controlled through `isExpanded` and `onToggle(id)`.
-- No API calls, App wiring, or Step 8 work were added.
+- `App.jsx` preloads a transcript-style Python sample.
+- `Run Trace` posts to `http://localhost:8000/api/graph`.
+- The backend GraphModel is converted into React Flow nodes and edges.
+- Dagre lays the graph out top-down.
+- CodeNode, FlowEdge, GroupNode, and InspectorPanel are wired together.
+- Clicking an edge opens the inspector with before/after changed values.
+- Stdout and backend/API errors are shown clearly.
+- Backend-not-reachable error messaging was verified.
 
 Fix applied:
-- Added `flowtrace_mvp/frontend/src/components/GroupNode.jsx`.
-- Added minimal GroupNode CSS while preserving existing custom properties and global scaffold styling.
+- Replaced the placeholder app with the wired React Flow demo.
+- Added app layout CSS for the top bar, editor panel, graph canvas, stdout, and messages.
+- Added a FlowEdge click hitbox so selecting graph edges reliably opens the inspector.
+- Added `flowtrace_mvp/DEMO.md`.
 
 Verification:
 - `npm run build` passed.
 - `python -m pytest flowtrace_mvp/tests` passed with 24 tests.
+- Manual browser check passed on `http://127.0.0.1:5173`.
+- Sample graph rendered in 875 ms during the browser check.
 
 ## Last ChatGPT baseline output
 Added an initial `flowtrace_mvp/backend/graph_builder.py` and `flowtrace_mvp/tests/test_graph_builder.py` baseline for Step 1.
@@ -48,7 +54,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1, Step 2, Step 3, Step 4, Step 5, Step 6, and Step 7 are verified. Do not start Step 8 until explicitly requested.
+All planned build steps are verified complete.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -65,10 +71,9 @@ Assumptions in the Step 1 baseline:
 - `/health` exists for simple backend readiness checks.
 - `stdin` is accepted by the request model but is not wired into runner execution yet.
 - Step 3 used Vite defaults and did not add a custom `vite.config.js`.
-- React Flow and Dagre are installed but not wired into app logic yet.
-- `CodeNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
-- `FlowEdge.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
-- `InspectorPanel.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
-- `GroupNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to Step 8.
+- React Flow, Dagre, CodeNode, FlowEdge, InspectorPanel, and GroupNode are wired into `App.jsx`.
+- Group nodes are rendered as summary nodes, but collapsed groups do not yet hide or re-route their child nodes.
+- Group expand/collapse changes group visual state and does not crash the app.
+- Source/target node highlighting is not implemented yet; selected edge highlighting is implemented.
 
-Codex completed the Step 7 GroupNode component and did not start Step 8.
+Codex completed Step 8 and the planned React Flow demo build.

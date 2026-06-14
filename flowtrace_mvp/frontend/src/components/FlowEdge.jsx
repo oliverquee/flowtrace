@@ -44,6 +44,7 @@ export default function FlowEdge({
         style={{ stroke, strokeWidth, strokeDasharray, cursor: "pointer" }}
         onClick={handleClick}
       />
+      <path className="flow-edge__hitbox" d={edgePath} onClick={handleClick} />
       {executionCount > 1 ? (
         <EdgeLabelRenderer>
           <button

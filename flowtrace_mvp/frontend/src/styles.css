@@ -34,9 +34,136 @@ body {
   background: #0f0f0f;
 }
 
+button {
+  font: inherit;
+}
+
 code,
 pre {
   font-family: "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+}
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  flex-direction: column;
+  background: #0f0f0f;
+  overflow: hidden;
+}
+
+.top-bar {
+  display: flex;
+  height: 56px;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #1F2937;
+  background: #111111;
+  padding: 0 18px;
+}
+
+.top-bar h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.top-bar button {
+  border: 1px solid var(--edge-active);
+  border-radius: 6px;
+  background: var(--edge-active);
+  color: #FFFFFF;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 7px 12px;
+}
+
+.top-bar button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.top-bar__status {
+  color: #D1D5DB;
+  font-size: 13px;
+}
+
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.code-panel {
+  width: 300px;
+  flex: 0 0 300px;
+  min-height: 0;
+  border-right: 1px solid #1F2937;
+  background: #111827;
+  padding: 12px;
+}
+
+.code-panel textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  outline: none;
+  background: #0f0f0f;
+  color: #F9FAFB;
+  font-family: "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 12px;
+}
+
+.graph-panel {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.react-flow {
+  width: 100%;
+  height: 100%;
+  background: #0f0f0f;
+}
+
+.empty-state,
+.app-message,
+.stdout-panel {
+  position: absolute;
+  left: 16px;
+  z-index: 5;
+  border: 1px solid #374151;
+  border-radius: 8px;
+  background: #111827;
+  color: #E5E7EB;
+  padding: 10px 12px;
+}
+
+.empty-state {
+  top: 16px;
+}
+
+.app-message {
+  top: 16px;
+  max-width: 560px;
+}
+
+.app-message--error {
+  border-color: #7F1D1D;
+  color: #FCA5A5;
+}
+
+.stdout-panel {
+  bottom: 16px;
+  max-width: 640px;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 
 .code-node {
@@ -107,6 +234,14 @@ pre {
   font: 600 11px/1 Inter, system-ui, sans-serif;
   padding: 3px 7px;
   pointer-events: all;
+}
+
+.flow-edge__hitbox {
+  cursor: pointer;
+  fill: none;
+  pointer-events: stroke;
+  stroke: transparent;
+  stroke-width: 16;
 }
 
 .inspector-panel {
