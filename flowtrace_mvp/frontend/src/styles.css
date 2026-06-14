@@ -38,3 +38,61 @@ code,
 pre {
   font-family: "JetBrains Mono", Consolas, "Liberation Mono", monospace;
 }
+
+.code-node {
+  width: 280px;
+  border: 1px solid #1F2937;
+  border-left: 3px solid var(--node-skipped);
+  border-radius: 8px;
+  background: #111827;
+  color: #F9FAFB;
+  padding: 10px 12px;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 24%);
+}
+
+.code-node--executed {
+  border-left-color: var(--node-executed);
+  opacity: 1;
+}
+
+.code-node--skipped {
+  color: #9CA3AF;
+  opacity: 0.4;
+}
+
+.code-node--tinted {
+  background: #ffffff08;
+}
+
+.code-node__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--node-skipped);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.code-node__badge {
+  border-radius: 999px;
+  background: #1F2937;
+  color: #D1D5DB;
+  padding: 2px 6px;
+}
+
+.code-node__code {
+  margin: 8px 0 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre;
+}
+
+.code-node__handle {
+  width: 8px;
+  height: 8px;
+  border: 1px solid #0f0f0f;
+  background: var(--edge-active);
+}

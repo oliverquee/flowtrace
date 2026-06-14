@@ -1,41 +1,36 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 3 - Frontend scaffold complete
+Step 4 - CodeNode.jsx complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
 - [x] Step 2: /api/graph endpoint
 - [x] Step 3: Frontend scaffold
-- [ ] Step 4: CodeNode.jsx
+- [x] Step 4: CodeNode.jsx
 - [ ] Step 5: FlowEdge.jsx
 - [ ] Step 6: InspectorPanel.jsx
 - [ ] Step 7: GroupNode.jsx
 - [ ] Step 8: App.jsx
 
 ## Last Codex output
-Scaffolded and verified Step 3 frontend setup.
+Built and verified the Step 4 `CodeNode.jsx` React Flow component.
 
 What was checked:
-- Created `flowtrace_mvp/frontend/` with Vite, React, React Flow, and Dagre dependencies.
-- Added `package.json`, `package-lock.json`, `index.html`, `src/main.jsx`, `src/App.jsx`, `src/styles.css`, and `src/components/`.
-- `App.jsx` renders only `FlowTrace loading...`.
-- `main.jsx` uses the standard React `createRoot` entry point.
-- Global CSS includes the requested dark background, font setup, and graph color custom properties.
-- No API calls, React Router, testing libraries, component logic, or frontend wiring were added.
+- `CodeNode.jsx` is a stateless custom React Flow node.
+- The component uses top target and bottom source handles.
+- It reads node data fields from React Flow `data`.
+- It shows line number, truncated monospace code, tooltip full code, execution state styling, and repeated execution badges.
+- Condition and loop-header nodes receive a subtle tint.
+- No API calls, click handlers, FlowEdge, InspectorPanel, GroupNode, App wiring, or Step 5 work were added.
 
 Fix applied:
-- Added a frontend-local `.gitignore` so `node_modules/` and `dist/` stay uncommitted.
+- Added `flowtrace_mvp/frontend/src/components/CodeNode.jsx`.
+- Added minimal CodeNode CSS while preserving existing custom properties and global scaffold styling.
 
 Verification:
-- `npm install` passed.
 - `npm run build` passed.
-
-Dev command:
-- `npm run dev`
-
-Expected dev URL:
-- http://localhost:5173/
+- `python -m pytest flowtrace_mvp/tests` passed with 24 tests.
 
 ## Last ChatGPT baseline output
 Added an initial `flowtrace_mvp/backend/graph_builder.py` and `flowtrace_mvp/tests/test_graph_builder.py` baseline for Step 1.
@@ -53,7 +48,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1, Step 2, and Step 3 are verified. Do not start Step 4 until explicitly requested.
+Step 1, Step 2, Step 3, and Step 4 are verified. Do not start Step 5 until explicitly requested.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -71,6 +66,6 @@ Assumptions in the Step 1 baseline:
 - `stdin` is accepted by the request model but is not wired into runner execution yet.
 - Step 3 used Vite defaults and did not add a custom `vite.config.js`.
 - React Flow and Dagre are installed but not wired into app logic yet.
-- Step 4 component implementation remains untouched.
+- `CodeNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 
-Codex completed the Step 3 frontend scaffold and did not start Step 4.
+Codex completed the Step 4 CodeNode component and did not start Step 5.
