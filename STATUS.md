@@ -1,7 +1,7 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 6 - InspectorPanel.jsx complete
+Step 7 - GroupNode.jsx complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
@@ -10,23 +10,23 @@ Step 6 - InspectorPanel.jsx complete
 - [x] Step 4: CodeNode.jsx
 - [x] Step 5: FlowEdge.jsx
 - [x] Step 6: InspectorPanel.jsx
-- [ ] Step 7: GroupNode.jsx
+- [x] Step 7: GroupNode.jsx
 - [ ] Step 8: App.jsx
 
 ## Last Codex output
-Built and verified the Step 6 `InspectorPanel.jsx` edge inspector component.
+Built and verified the Step 7 `GroupNode.jsx` collapsible group node component.
 
 What was checked:
-- `InspectorPanel.jsx` renders nothing when `edge` is null.
-- It renders a fixed right sidebar when an edge is selected.
-- It resets selected pass state to the latest pass when the selected edge changes.
-- It displays source/target, close button, pass tabs, changed variables, stdout, and errors.
-- Changed variables use the GraphModel `{ before, after }` format.
-- No API calls, GroupNode, App wiring, or Step 7 work were added.
+- `GroupNode.jsx` is a stateless React Flow node.
+- It uses top target and bottom source handles.
+- It renders loop, function, and if-block group icons and dashed borders.
+- It shows run count, input/output variables, status badge, and expand/collapse button.
+- Expansion remains parent-controlled through `isExpanded` and `onToggle(id)`.
+- No API calls, App wiring, or Step 8 work were added.
 
 Fix applied:
-- Added `flowtrace_mvp/frontend/src/components/InspectorPanel.jsx`.
-- Added minimal InspectorPanel CSS while preserving existing custom properties and global scaffold styling.
+- Added `flowtrace_mvp/frontend/src/components/GroupNode.jsx`.
+- Added minimal GroupNode CSS while preserving existing custom properties and global scaffold styling.
 
 Verification:
 - `npm run build` passed.
@@ -48,7 +48,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1, Step 2, Step 3, Step 4, Step 5, and Step 6 are verified. Do not start Step 7 until explicitly requested.
+Step 1, Step 2, Step 3, Step 4, Step 5, Step 6, and Step 7 are verified. Do not start Step 8 until explicitly requested.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -69,5 +69,6 @@ Assumptions in the Step 1 baseline:
 - `CodeNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 - `FlowEdge.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 - `InspectorPanel.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
+- `GroupNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to Step 8.
 
-Codex completed the Step 6 InspectorPanel component and did not start Step 7.
+Codex completed the Step 7 GroupNode component and did not start Step 8.
