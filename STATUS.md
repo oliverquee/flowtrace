@@ -1,32 +1,32 @@
 # FlowTrace Build Status
 
 ## Current step
-Step 4 - CodeNode.jsx complete
+Step 5 - FlowEdge.jsx complete
 
 ## Progress
 - [x] Step 1: graph_builder.py
 - [x] Step 2: /api/graph endpoint
 - [x] Step 3: Frontend scaffold
 - [x] Step 4: CodeNode.jsx
-- [ ] Step 5: FlowEdge.jsx
+- [x] Step 5: FlowEdge.jsx
 - [ ] Step 6: InspectorPanel.jsx
 - [ ] Step 7: GroupNode.jsx
 - [ ] Step 8: App.jsx
 
 ## Last Codex output
-Built and verified the Step 4 `CodeNode.jsx` React Flow component.
+Built and verified the Step 5 `FlowEdge.jsx` React Flow custom edge.
 
 What was checked:
-- `CodeNode.jsx` is a stateless custom React Flow node.
-- The component uses top target and bottom source handles.
-- It reads node data fields from React Flow `data`.
-- It shows line number, truncated monospace code, tooltip full code, execution state styling, and repeated execution badges.
-- Condition and loop-header nodes receive a subtle tint.
-- No API calls, click handlers, FlowEdge, InspectorPanel, GroupNode, App wiring, or Step 5 work were added.
+- `FlowEdge.jsx` is a stateless custom React Flow edge.
+- It uses React Flow `getBezierPath` and `EdgeLabelRenderer`.
+- Executed edges use active solid styling, skipped edges use inactive dashed styling, and highlighted edges use brighter wider styling.
+- Repeated execution counts render as midpoint badges such as `6x`.
+- Edge clicks call `data.onEdgeClick(id)` when provided.
+- No API calls, InspectorPanel, GroupNode, App wiring, or Step 6 work were added.
 
 Fix applied:
-- Added `flowtrace_mvp/frontend/src/components/CodeNode.jsx`.
-- Added minimal CodeNode CSS while preserving existing custom properties and global scaffold styling.
+- Added `flowtrace_mvp/frontend/src/components/FlowEdge.jsx`.
+- Added minimal FlowEdge badge CSS while preserving existing custom properties and global scaffold styling.
 
 Verification:
 - `npm run build` passed.
@@ -48,7 +48,7 @@ This baseline was committed through GitHub without local execution. Codex must r
 ## Known issues
 The current plain HTML MVP shows a linear trace list, not the intended graph/circuit view. The next build must create a proper GraphModel before frontend graph rendering.
 
-Step 1, Step 2, Step 3, and Step 4 are verified. Do not start Step 5 until explicitly requested.
+Step 1, Step 2, Step 3, Step 4, and Step 5 are verified. Do not start Step 6 until explicitly requested.
 
 ## Notes
 Assumptions in the Step 1 baseline:
@@ -67,5 +67,6 @@ Assumptions in the Step 1 baseline:
 - Step 3 used Vite defaults and did not add a custom `vite.config.js`.
 - React Flow and Dagre are installed but not wired into app logic yet.
 - `CodeNode.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
+- `FlowEdge.jsx` is implemented but not wired into `App.jsx` yet; wiring is deferred to a later step.
 
-Codex completed the Step 4 CodeNode component and did not start Step 5.
+Codex completed the Step 5 FlowEdge component and did not start Step 6.

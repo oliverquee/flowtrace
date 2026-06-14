@@ -96,3 +96,15 @@ pre {
   border: 1px solid #0f0f0f;
   background: var(--edge-active);
 }
+
+.flow-edge__badge {
+  position: absolute;
+  border: 1px solid #1F2937;
+  border-radius: 999px;
+  background: #111827;
+  color: #E5E7EB;
+  cursor: pointer;
+  font: 600 11px/1 Inter, system-ui, sans-serif;
+  padding: 3px 7px;
+  pointer-events: all;
+}
