@@ -18,6 +18,7 @@ python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "fail"
 python -m flowtrace.cli --entry sample_project\cli_case.py
 python -m flowtrace.cli --entry sample_project\cli_case.py --static-only --target-args "hello --name Pratham"
 python -m flowtrace.cli --entry sample_project\cli_case.py --target-args "hello --name Pratham" --intended-flow sample_project\cli_case_intended_flow.json
+python -m flowtrace.cli --entry sample_project\main.py --capture-variables
 ```
 
 ## Real Project Test
@@ -38,6 +39,7 @@ Gmail automation project static-only scan works.
 - Static-only skips runtime behavior
 - Import resolution is simple
 - Markdown is curated; JSON is raw
+- Variable capture is opt-in (--capture-variables), line-granularity, and redacts names matching common secret/credential patterns; values are best-effort repr() and may be truncated.
 
 ## Safety Notes
 

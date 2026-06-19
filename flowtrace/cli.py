@@ -42,6 +42,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Arguments to pass to the target script, parsed without shell execution.",
     )
+    parser.add_argument(
+        "--capture-variables",
+        action="store_true",
+        default=False,
+        help="Capture local variable changes per executed line (opt-in; ignored in --static-only mode).",
+    )
     parser.add_argument("--output-dir", dest="output", help=argparse.SUPPRESS)
     return parser
 
@@ -68,7 +74,12 @@ def main(argv: list[str] | None = None) -> int:
                 target_args,
             )
         else:
-            runtime_result = run_with_trace(entry_path, project_root, target_args)
+            runtime_result = run_with_trace(
+                entry_path,
+                project_root,
+                target_args,
+                capture_variables=args.capture_variables,
+            )
         intended_comparison = compare_intended_flow(args.intended_flow, runtime_result)
         diagnostics = build_diagnostics(static_result, runtime_result)
         static_runtime_comparison = build_static_runtime_comparison(static_result, runtime_result)

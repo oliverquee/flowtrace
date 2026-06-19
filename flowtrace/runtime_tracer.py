@@ -24,6 +24,15 @@ class RuntimeEvent:
     error_type: str | None = None
     error_message: str | None = None
     timestamp: float = 0.0
+    changed_vars: dict[str, dict[str, str | None]] | None = None
+
+    def __getattribute__(self, name: str) -> Any:
+        if name == "__dict__":
+            data = object.__getattribute__(self, name).copy()
+            if data.get("changed_vars") is None:
+                data.pop("changed_vars", None)
+            return data
+        return object.__getattribute__(self, name)
 
 
 @dataclass
@@ -56,7 +65,12 @@ def skipped_runtime_result(
     )
 
 
-def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] | None = None) -> RuntimeTraceResult:
+def run_with_trace(
+    entry_path: Path,
+    project_root: Path,
+    target_args: list[str] | None = None,
+    capture_variables: bool = False,
+) -> RuntimeTraceResult:
     parsed_target_args = target_args or []
     result = RuntimeTraceResult(
         entry=str(entry_path),
@@ -67,6 +81,7 @@ def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] 
     previous_argv = sys.argv[:]
     previous_path = sys.path[:]
     call_stack: list[str] = []
+    variable_snapshots: dict[int, dict[str, str]] = {}
     target_is_flowtrace = is_relative_to(entry_path, flowtrace_source_root())
 
     def tracer(frame: FrameType, event: str, arg: Any) -> Any:
@@ -80,6 +95,8 @@ def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] 
         if event == "call":
             caller = call_stack[-1] if call_stack else None
             call_stack.append(function_name)
+            if capture_variables:
+                variable_snapshots[id(frame)] = {}
             result.events.append(
                 RuntimeEvent(
                     event="function_enter",
@@ -90,6 +107,21 @@ def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] 
                     timestamp=time.time(),
                 )
             )
+        elif event == "line":
+            if capture_variables:
+                changed_vars = _changed_locals(frame, variable_snapshots.get(id(frame), {}))
+                variable_snapshots[id(frame)] = _locals_snapshot(frame)
+                if changed_vars:
+                    result.events.append(
+                        RuntimeEvent(
+                            event="variable_change",
+                            function=function_name,
+                            file=file_name,
+                            line=frame.f_lineno,
+                            timestamp=time.time(),
+                            changed_vars=changed_vars,
+                        )
+                    )
         elif event == "return":
             result.events.append(
                 RuntimeEvent(
@@ -103,8 +135,10 @@ def run_with_trace(entry_path: Path, project_root: Path, target_args: list[str] 
             )
             if call_stack and call_stack[-1] == function_name:
                 call_stack.pop()
+            variable_snapshots.pop(id(frame), None)
         elif event == "exception":
             exc_type, exc_value, _traceback = arg
+            variable_snapshots.pop(id(frame), None)
             error_event = RuntimeEvent(
                 event="function_error",
                 function=function_name,
@@ -157,6 +191,54 @@ def _should_trace(path: Path, project_root: Path, target_is_flowtrace: bool) -> 
 
 def _qualname(frame: FrameType) -> str:
     return getattr(frame.f_code, "co_qualname", frame.f_code.co_name)
+
+
+def _changed_locals(frame: FrameType, previous: dict[str, str]) -> dict[str, dict[str, str | None]]:
+    changed: dict[str, dict[str, str | None]] = {}
+    current = _locals_snapshot(frame)
+    for name, after_value in current.items():
+        before_value = previous.get(name)
+        if name not in previous or before_value != after_value:
+            if _is_sensitive_name(name):
+                changed[name] = {"before": "<redacted>", "after": "<redacted>"}
+            else:
+                changed[name] = {"before": before_value, "after": after_value}
+    return changed
+
+
+def _locals_snapshot(frame: FrameType) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    for name, value in frame.f_locals.items():
+        if name.startswith("__"):
+            continue
+        snapshot[name] = "<redacted>" if _is_sensitive_name(name) else _safe_repr(value)
+    return snapshot
+
+
+def _is_sensitive_name(name: str) -> bool:
+    sensitive_terms = {
+        "password",
+        "passwd",
+        "secret",
+        "token",
+        "apikey",
+        "api_key",
+        "credential",
+        "auth",
+        "private_key",
+    }
+    lowered = name.lower()
+    return any(term in lowered for term in sensitive_terms)
+
+
+def _safe_repr(value: object) -> str:
+    try:
+        text = repr(value)
+    except Exception:
+        return "<unrepresentable>"
+    if len(text) > 200:
+        return text[:197] + "..."
+    return text
 
 
 def target_args_display(target_args: list[str]) -> str:
