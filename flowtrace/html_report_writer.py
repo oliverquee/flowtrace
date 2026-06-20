@@ -417,6 +417,7 @@ def _playback_html(runtime_result: RuntimeTraceResult) -> str:
             f"<label><input type='radio' name='playback-filter' value='all'{disabled_attr}> All events</label>",
             f"<label><input type='radio' name='playback-filter' value='enter'{disabled_attr}> Function enter only</label>",
             f"<label><input type='radio' name='playback-filter' value='errors'{disabled_attr}> Errors only</label>",
+            f"<label><input type='radio' name='playback-filter' value='vars'{disabled_attr}> Variable changes only</label>",
             "</fieldset>",
             "<div class='playback-controls'>",
             f"<button type='button' id='playback-first'{disabled_attr}>First</button>",
@@ -476,6 +477,7 @@ def _embedded_runtime_events_json(runtime_result: RuntimeTraceResult) -> str:
                 "timestamp": None,
                 "error_type": None,
                 "error_message": runtime_result.runtime_skipped_reason,
+                "changed_vars": None,
             }
         )
     else:
@@ -491,6 +493,7 @@ def _embedded_runtime_events_json(runtime_result: RuntimeTraceResult) -> str:
                     "timestamp": event.timestamp,
                     "error_type": event.error_type,
                     "error_message": event.error_message,
+                    "changed_vars": event.changed_vars,
                 }
             )
     payload = json.dumps(events, sort_keys=True)
@@ -579,6 +582,79 @@ def _node_inspector_script() -> str:
     parent.appendChild(pre);
   }
 
+  function hasChangedVars(value) {
+    return value && typeof value === "object" && Object.keys(value).length > 0;
+  }
+
+  function valueText(value) {
+    return value == null ? "None" : String(value);
+  }
+
+  function appendVariableChangeTable(parent, changedVars) {
+    var table = document.createElement("table");
+    table.className = "var-change-table";
+    var thead = document.createElement("thead");
+    var headRow = document.createElement("tr");
+    ["Variable", "Before", "After"].forEach(function (label) {
+      appendText(headRow, "th", label);
+    });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    Object.keys(changedVars).forEach(function (name) {
+      var change = changedVars[name] || {};
+      var row = document.createElement("tr");
+      appendText(row, "td", name);
+      appendText(row, "td", valueText(change.before));
+      appendText(row, "td", valueText(change.after));
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    parent.appendChild(table);
+  }
+
+  function appendEventVariableChanges(parent, event) {
+    if (!event || event.event !== "variable_change" || !hasChangedVars(event.changed_vars)) {
+      return;
+    }
+    var section = document.createElement("div");
+    section.className = "var-changes-section";
+    appendText(section, "h4", "Changed variables");
+    appendVariableChangeTable(section, event.changed_vars);
+    parent.appendChild(section);
+  }
+
+  function appendNodeVariableChanges(parent, id) {
+    var events = runtimeEvents.filter(function (event) {
+      return event && event.event === "variable_change" && event.function === id && hasChangedVars(event.changed_vars);
+    });
+    if (!events.length) {
+      return;
+    }
+    var section = document.createElement("div");
+    section.className = "var-changes-section";
+    appendText(section, "h4", "Variable changes (" + events.length + " line events)");
+    var groups = [];
+    events.forEach(function (event) {
+      var line = event.line == null ? "None" : String(event.line);
+      var group = groups.find(function (item) {
+        return item.line === line;
+      });
+      if (!group) {
+        group = {line: line, events: []};
+        groups.push(group);
+      }
+      group.events.push(event);
+    });
+    groups.forEach(function (group) {
+      appendText(section, "p", "Line " + group.line, "var-changes-line-label");
+      group.events.forEach(function (event) {
+        appendVariableChangeTable(section, event.changed_vars);
+      });
+    });
+    parent.appendChild(section);
+  }
+
   function appendSourceSnippet(parent, snippet) {
     appendText(parent, "h4", "Source snippet");
     if (!snippet || !snippet.available) {
@@ -664,6 +740,7 @@ def _node_inspector_script() -> str:
     panel.appendChild(meta);
 
     appendSourceSnippet(panel, detail.source_snippet);
+    appendNodeVariableChanges(panel, id);
     appendJsonBlock(panel, "Incoming static calls", detail.incoming_static_calls);
     appendJsonBlock(panel, "Outgoing static calls", detail.outgoing_static_calls);
     appendJsonBlock(panel, "Incoming runtime calls", detail.incoming_runtime_calls);
@@ -744,6 +821,9 @@ def _node_inspector_script() -> str:
     if (filter === "errors") {
       return isErrorEvent(event);
     }
+    if (filter === "vars") {
+      return event && event.event === "variable_change";
+    }
     return true;
   }
 
@@ -786,6 +866,7 @@ def _node_inspector_script() -> str:
     appendKeyValue(meta, "error_type", event && event.error_type);
     appendKeyValue(meta, "message", event && event.error_message);
     eventDetail.appendChild(meta);
+    appendEventVariableChanges(eventDetail, event);
   }
 
   function updateCounter() {
@@ -1352,6 +1433,12 @@ table{border-collapse:collapse;width:100%;margin:8px 0}th,td{text-align:left;bor
 .source-snippet .line-number{width:52px;text-align:right;color:#64748b;background:#f8fafc;user-select:none}
 .source-snippet .line-text{white-space:pre;overflow-wrap:normal}
 .source-snippet .focus-line .line-number,.source-snippet .focus-line .line-text{background:#fef3c7;color:#111827;font-weight:700}
+.var-changes-section{margin:10px 0}
+.var-changes-line-label{font-size:12px;color:#667085;margin:8px 0 4px;font-family:Consolas,Menlo,monospace}
+.var-change-table{width:100%;border-collapse:collapse;font-family:Consolas,Menlo,monospace;font-size:12px}
+.var-change-table th{color:#667085;font-weight:700;padding:4px 6px;border-bottom:1px solid #e1e6ef}
+.var-change-table td{padding:3px 6px;border-bottom:1px solid #f1f5f9;overflow-wrap:anywhere}
+.var-change-table td:first-child{color:#1d4ed8}
 li{margin:3px 0;overflow-wrap:anywhere}
 @media print{
 body{background:#fff;color:#111827;font-size:12px}
